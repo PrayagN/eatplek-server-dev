@@ -1,0 +1,15 @@
+{
+  "watch": ["."],
+  "ext": "js,json",
+  "ignore": ["node_modules", "*.test.js", "*.spec.js"],
+  "exec": "node server.js",
+  "delay": 1000,
+  "restartable": "rs",
+  "verbose": true,
+  "colours": true,
+  "signal": "SIGTERM",
+  "shutdown": {
+    "graceful": true
+  }
+}
+
