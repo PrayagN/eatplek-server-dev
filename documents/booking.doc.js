@@ -115,6 +115,69 @@
 
 /**
  * @swagger
+ * /api/bookings/{bookingId}/payment-confirm:
+ *   post:
+ *     summary: Confirm PhonePe payment for a booking
+ *     description: |
+ *       Verifies and confirms the payment status of an accepted order after the user completes the PhonePe flow.
+ *       The order must be in 'accepted' status before payment can be confirmed.
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the booking to confirm payment for
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - transactionId
+ *             properties:
+ *               transactionId:
+ *                 type: string
+ *                 description: PhonePe transaction ID
+ *               providerReferenceId:
+ *                 type: string
+ *                 description: Bank reference number (optional)
+ *               amount:
+ *                 type: number
+ *                 description: Amount paid (optional, defaults to booking total)
+ *               paymentMethod:
+ *                 type: string
+ *                 description: Payment method used (optional, defaults to ONLINE)
+ *                 example: "ONLINE"
+ *     responses:
+ *       200:
+ *         description: Payment confirmed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/BookingResponse'
+ *       400:
+ *         description: Bad request (payment already completed, order not accepted)
+ *         $ref: '#/components/responses/Error'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: Booking not found
+ */
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     BookingResponse:
@@ -158,5 +221,25 @@
  *         vendorResponseAt:
  *           type: string
  *           format: date-time
+ *         paymentStatus:
+ *           type: string
+ *           enum: [pending, completed, failed, refunded]
+ *         paymentDetails:
+ *           type: object
+ *           properties:
+ *             transactionId:
+ *               type: string
+ *               nullable: true
+ *             providerReferenceId:
+ *               type: string
+ *               nullable: true
+ *             amount:
+ *               type: number
+ *             paymentMethod:
+ *               type: string
+ *               nullable: true
+ *             paidAt:
+ *               type: string
+ *               format: date-time
+ *               nullable: true
  */
-

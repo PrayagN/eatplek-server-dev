@@ -1,0 +1,53 @@
+# PhonePe Payment Confirmation Integration
+
+This walkthrough summarizes the changes made to correctly track, verify, and expose completed PhonePe payments to the vendor app, and how these changes align with the UI/UX flows found in the Eatplek Figma design.
+
+## Figma Flow Validation
+
+I successfully explored the Eatplek Figma design file to validate that our backend approach perfectly supports the intended UI logic for both Users and Vendors:
+
+1. **Vendor Accepts Order**: The vendor receives the booking request. They accept it, changing its state to `Accepted`.
+![Vendor Accepting Order](C:/Users/Asus/.gemini/antigravity/brain/52b68eda-fd05-4fb6-893c-9efa6602252b/vendor_order_details_accept_1771608452100.png)
+
+2. **User Initiates Payment**: The user's screen updates to show the order is `Accepted` and the "Proceed to Payment" button becomes active. When clicked, it opens the payment method selection bottom sheet (with PhonePe defaults).
+![User Payment Selection](C:/Users/Asus/.gemini/antigravity/brain/52b68eda-fd05-4fb6-893c-9efa6602252b/user_payment_selection_1771608583439.png)
+
+3. **Confirmation and Order Processing**: Once PhonePe payment is successful, the app calls our new `payment-confirm` API, and the user sees the "Order Accepted! Preparing your food now" screen while the order automatically shifts back to the Vendor's active queue.
+
+Our new `paymentStatus` database field and the specific `orders/active` endpoint map cleanly to these visual states.
+
+## Database Additions
+
+The `Booking` model was updated to include robust payment tracking fields alongside the standard `orderStatus`.
+- **paymentStatus**: Indicates the state of the payment itself (`pending`, `completed`, `failed`, `refunded`).
+- **paymentDetails**: Stores the PhonePe `transactionId`, `providerReferenceId`, `amount`, and `paidAt` timestamp.
+
+## Payment Flow Integration
+
+### PhonePe Utility
+Created a new `phonepe.js` utility that uses native `crypto` to generate checksums dynamically based on your PhonePe `merchantId` and `saltKey` from your `.env`. It also provides a boilerplate function that mimics making an Axios request to PhonePe's servers to verify transaction status (S2S server-to-server).
+
+### Confirmation Endpoint
+Added `POST /api/bookings/:bookingId/payment-confirm`.
+- **Validations**: Ensures the order is actually `accepted` by the vendor before processing payments.
+- **Process**: Upon successful frontend payment, this endpoint sets `paymentStatus` to `completed`, stores the `transactionId`, and saves the current timestamp.
+- **Result**: The formatted booking response returned to the frontend now includes the `paymentStatus` field!
+
+## Vendor Real-time Visibility
+
+As requested, we needed a way for vendors to see orders that were both accepted by them *and* successfully paid for by the customer.
+
+- **New Route**: `GET /api/vendor/orders/active`
+- **Controller Action**: Added `getVendorActiveOrders`.
+- **Purpose**: This endpoint explicitly fetches orders where `orderStatus: 'accepted'` AND `paymentStatus: 'completed'`. This matches the requirement for the vendor to wait until the order is paid before starting preparation.
+
+> [!NOTE]
+> The Vendor FCM Push Notification implementation was skipped for now per your feedback, but all database models already have `firebaseTokens` arrays, making that feature easy to add when you're ready!
+
+## Next Steps for Testing
+
+If you are using Postman to test:
+1. Hit `POST /api/bookings`
+2. Wait for vendor acceptance.
+3. Hit `POST /api/bookings/:bookingId/payment-confirm` and pass `transactionId` in the body.
+4. Hit `GET /api/vendor/orders/active` using a vendor auth token, and your freshly paid order will appear!

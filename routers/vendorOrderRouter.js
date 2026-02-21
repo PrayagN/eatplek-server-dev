@@ -3,9 +3,18 @@ const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const {
 	getVendorOrders,
-	respondToOrder
+	respondToOrder,
+	getVendorActiveOrders
 } = require('../controllers/bookingController');
 const { respondToOrderValidation } = require('../validations/booking.validations');
+
+// Get vendor's active/paid orders
+router.get(
+	'/orders/active',
+	authenticateToken,
+	requireRole('vendor'),
+	getVendorActiveOrders
+);
 
 // Get vendor's pending orders
 router.get(

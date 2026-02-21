@@ -38,6 +38,37 @@
 
 /**
  * @swagger
+ * /api/vendor/orders/active:
+ *   get:
+ *     summary: Get vendor's active/paid orders
+ *     description: Returns orders that are accepted by the vendor and paid successfully by the customer (ready for preparation).
+ *     tags: [Vendor Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Vendor active orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/BookingResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Unauthorized - Vendor access required
+ */
+
+/**
+ * @swagger
  * /api/vendor/orders/{bookingId}/respond:
  *   put:
  *     summary: Accept or reject an order
@@ -310,6 +341,27 @@
  *         vendorResponseAt:
  *           type: string
  *           format: date-time
+ *         paymentStatus:
+ *           type: string
+ *           enum: [pending, completed, failed, refunded]
+ *         paymentDetails:
+ *           type: object
+ *           properties:
+ *             transactionId:
+ *               type: string
+ *               nullable: true
+ *             providerReferenceId:
+ *               type: string
+ *               nullable: true
+ *             amount:
+ *               type: number
+ *             paymentMethod:
+ *               type: string
+ *               nullable: true
+ *             paidAt:
+ *               type: string
+ *               format: date-time
+ *               nullable: true
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -317,4 +369,3 @@
  *           type: string
  *           format: date-time
  */
-

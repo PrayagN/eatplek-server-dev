@@ -30,19 +30,19 @@ class BookingController {
 			notes: booking.notes,
 			user: booking.user
 				? {
-						id: booking.user._id?.toString() || booking.user.toString(),
-						name: booking.user.name || null,
-						phone: booking.user.phone || null,
-						dialCode: booking.user.dialCode || null,
-						userCode: booking.user.userCode || null
-					}
+					id: booking.user._id?.toString() || booking.user.toString(),
+					name: booking.user.name || null,
+					phone: booking.user.phone || null,
+					dialCode: booking.user.dialCode || null,
+					userCode: booking.user.userCode || null
+				}
 				: booking.user?.toString?.() || booking.user || null,
 			vendor: booking.vendor
 				? {
-						id: booking.vendor._id?.toString() || booking.vendor.toString(),
-						name: booking.vendor.restaurantName,
-						gstPercentage: booking.vendor.gstPercentage ?? totals.taxPercentage ?? 0
-					}
+					id: booking.vendor._id?.toString() || booking.vendor.toString(),
+					name: booking.vendor.restaurantName,
+					gstPercentage: booking.vendor.gstPercentage ?? totals.taxPercentage ?? 0
+				}
 				: null,
 			cartSnapshot: booking.cartSnapshot,
 			amountSummary: {
@@ -73,6 +73,12 @@ class BookingController {
 			};
 		}
 
+		// Add payment details
+		response.paymentStatus = booking.paymentStatus || 'pending';
+		if (booking.paymentDetails) {
+			response.paymentDetails = booking.paymentDetails;
+		}
+
 		return response;
 	}
 
@@ -84,7 +90,7 @@ class BookingController {
 	async getActualCartForBooking(userId) {
 		try {
 			const userCart = await Cart.findOne({ user: userId });
-			
+
 			if (!userCart) {
 				return null;
 			}
@@ -94,14 +100,14 @@ class BookingController {
 				const connectedCart = await Cart.findById(userCart.connectedCart)
 					.populate('vendor', 'restaurantName profileImage address gstPercentage contactNumber')
 					.populate('items.food', 'foodName foodImage type');
-				
+
 				if (!connectedCart) {
 					// Connected cart doesn't exist, disconnect
 					userCart.connectedCart = null;
 					await userCart.save();
 					return null;
 				}
-				
+
 				return connectedCart;
 			}
 
@@ -524,6 +530,99 @@ class BookingController {
 			});
 		}
 	}
+
+	async confirmPayment(req, res) {
+		try {
+			const { bookingId } = req.params;
+			const { transactionId, providerReferenceId, amount, paymentMethod } = req.body;
+			const userId = req.user.id;
+
+			const booking = await Booking.findOne({
+				_id: bookingId,
+				user: userId
+			});
+
+			if (!booking) {
+				return res.status(404).json({
+					success: false,
+					message: 'Booking not found'
+				});
+			}
+
+			if (booking.paymentStatus === 'completed') {
+				return res.status(400).json({
+					success: false,
+					message: 'Payment has already been completed for this order'
+				});
+			}
+
+			if (booking.orderStatus !== 'accepted') {
+				return res.status(400).json({
+					success: false,
+					message: `Cannot process payment for order with status: ${booking.orderStatus}. Order must be accepted by vendor first.`
+				});
+			}
+
+			// In a real scenario with PhonePe S2S validation, we would use the phonepe utility here
+			// const phonepeService = require('../utils/phonepe');
+			// const statusCheck = await phonepeService.checkStatus(transactionId);
+			// if (!statusCheck.success || statusCheck.code !== 'PAYMENT_SUCCESS') { ... }
+
+			booking.paymentStatus = 'completed';
+			booking.paymentDetails = {
+				transactionId: transactionId || null,
+				providerReferenceId: providerReferenceId || null,
+				amount: amount || booking.amountSummary.grandTotal,
+				paymentMethod: paymentMethod || 'ONLINE',
+				paidAt: new Date()
+			};
+
+			await booking.save();
+			await booking.populate('vendor', 'restaurantName gstPercentage profileImage');
+
+			return res.json({
+				success: true,
+				message: 'Payment confirmed successfully',
+				data: this.formatBookingResponse(booking)
+			});
+		} catch (error) {
+			console.error('Error confirming payment:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to confirm payment',
+				error: error.message
+			});
+		}
+	}
+
+	async getVendorActiveOrders(req, res) {
+		try {
+			const vendorId = req.user.id;
+
+			// Get active (paid and accepted) orders for this vendor
+			const orders = await Booking.find({
+				vendor: vendorId,
+				orderStatus: 'accepted',
+				paymentStatus: 'completed'
+			})
+				.populate('user', 'name phone dialCode userCode')
+				.populate('vendor', 'restaurantName gstPercentage')
+				.sort({ createdAt: -1 });
+
+			return res.json({
+				success: true,
+				message: 'Vendor active orders retrieved successfully',
+				data: orders.map((order) => this.formatBookingResponse(order))
+			});
+		} catch (error) {
+			console.error('Error fetching vendor active orders:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to fetch vendor active orders',
+				error: error.message
+			});
+		}
+	}
 }
 
 const controller = new BookingController();
@@ -531,6 +630,8 @@ const controller = new BookingController();
 module.exports = {
 	createBooking: controller.createBooking.bind(controller),
 	getVendorOrders: controller.getVendorOrders.bind(controller),
-	respondToOrder: controller.respondToOrder.bind(controller)
+	respondToOrder: controller.respondToOrder.bind(controller),
+	confirmPayment: controller.confirmPayment.bind(controller),
+	getVendorActiveOrders: controller.getVendorActiveOrders.bind(controller)
 };
 
