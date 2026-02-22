@@ -126,8 +126,8 @@ registerRoutes(app, { authLimiter, otpLimiter, passwordResetLimiter });
 app.use(errorHandler);
 
 // Start server
-const server = app.listen(PORT, hostName, () => {
-  console.log(`Server running at ${hostName}:${PORT}/`);
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
 
 // Handle server errors gracefully
