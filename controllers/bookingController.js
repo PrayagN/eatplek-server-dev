@@ -9,6 +9,69 @@ const POLL_INTERVAL_MS = 2000;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// SSE clients map: bookingId -> Set of response objects
+const sseClients = new Map();
+
+// Tracking step definitions per service type group
+const TRACKING_STEPS = {
+	delivery: [
+		{ status: 'pending', label: 'Waiting for Confirmation', description: 'Restaurant is reviewing your order' },
+		{ status: 'accepted', label: 'Order Confirmed', description: 'Restaurant accepted your order and is preparing it' },
+		{ status: 'preparing', label: 'Preparing Your Food', description: 'Kitchen is working on your order' },
+		{ status: 'out_for_delivery', label: 'Out for Delivery', description: 'Rider is on the way' },
+		{ status: 'completed', label: 'Delivered', description: 'Order completed successfully' }
+	],
+	takeaway: [
+		{ status: 'pending', label: 'Waiting for Confirmation', description: 'Restaurant is reviewing your order' },
+		{ status: 'accepted', label: 'Order Confirmed', description: 'Restaurant accepted your order and is preparing it' },
+		{ status: 'preparing', label: 'Preparing Your Food', description: 'Kitchen is working on your order' },
+		{ status: 'ready_for_pickup', label: 'Ready for Pickup', description: 'Your order is ready at the counter' },
+		{ status: 'completed', label: 'Completed', description: 'Order completed successfully' }
+	],
+	dinein: [
+		{ status: 'pending', label: 'Waiting for Confirmation', description: 'Restaurant is reviewing your order' },
+		{ status: 'accepted', label: 'Order Confirmed', description: 'Restaurant accepted your order and is preparing it' },
+		{ status: 'preparing', label: 'Preparing Your Food', description: 'Kitchen is working on your order' },
+		{ status: 'served', label: 'Served', description: 'Your food has been served' },
+		{ status: 'completed', label: 'Completed', description: 'Order completed successfully' }
+	]
+};
+
+// Valid next-status transitions (strict sequence)
+const STATUS_TRANSITIONS = {
+	delivery: { accepted: 'preparing', preparing: 'out_for_delivery', out_for_delivery: 'completed' },
+	takeaway: { accepted: 'preparing', preparing: 'ready_for_pickup', ready_for_pickup: 'completed' },
+	dinein: { accepted: 'preparing', preparing: 'served', served: 'completed' }
+};
+
+/**
+ * Get the service type group key for tracking steps
+ */
+function getServiceGroup(serviceType) {
+	const normalized = normalizeServiceType(serviceType);
+	if (!normalized) return 'delivery';
+	if (normalized === 'Delivery') return 'delivery';
+	if (normalized === 'Takeaway' || normalized === 'Pickup') return 'takeaway';
+	if (normalized === 'Dine in' || normalized === 'Car Dine in') return 'dinein';
+	return 'delivery';
+}
+
+/**
+ * Notify all SSE clients watching a specific booking
+ */
+function notifySSEClients(bookingId, data) {
+	const clients = sseClients.get(bookingId);
+	if (!clients) return;
+	for (const client of clients) {
+		try {
+			client.write(`data: ${JSON.stringify(data)}\n\n`);
+		} catch (err) {
+			console.error('SSE write error:', err.message);
+			clients.delete(client);
+		}
+	}
+}
+
 class BookingController {
 	formatBookingResponse(booking) {
 		if (!booking) {
@@ -78,6 +141,23 @@ class BookingController {
 		if (booking.paymentDetails) {
 			response.paymentDetails = booking.paymentDetails;
 		}
+
+		// Add service-type-specific tracking steps
+		const group = getServiceGroup(booking.serviceType);
+		const steps = TRACKING_STEPS[group] || TRACKING_STEPS.delivery;
+		const currentStatus = booking.orderStatus;
+		let reachedCurrent = false;
+
+		response.trackingSteps = steps.map((step) => {
+			if (step.status === currentStatus) {
+				reachedCurrent = true;
+				return { ...step, completed: true, active: true };
+			}
+			if (!reachedCurrent) {
+				return { ...step, completed: true, active: false };
+			}
+			return { ...step, completed: false, active: false };
+		});
 
 		return response;
 	}
@@ -623,6 +703,239 @@ class BookingController {
 			});
 		}
 	}
+
+	async getUserOrders(req, res) {
+		try {
+			const userId = req.user.id;
+			const page = parseInt(req.query.page) || 1;
+			const limit = parseInt(req.query.limit) || 20;
+			const skip = (page - 1) * limit;
+
+			// Get all orders for this user
+			const orders = await Booking.find({ user: userId })
+				.populate('vendor', 'restaurantName profileImage gstPercentage')
+				.populate('cartSnapshot.items.food', 'foodName foodImage type')
+				.sort({ createdAt: -1 })
+				.skip(skip)
+				.limit(limit);
+
+			const total = await Booking.countDocuments({ user: userId });
+
+			return res.json({
+				success: true,
+				message: 'User orders retrieved successfully',
+				data: {
+					orders: orders.map((order) => this.formatBookingResponse(order)),
+					pagination: {
+						total,
+						page,
+						limit,
+						totalPages: Math.ceil(total / limit)
+					}
+				}
+			});
+		} catch (error) {
+			console.error('Error fetching user orders:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to fetch user orders',
+				error: error.message
+			});
+		}
+	}
+
+	async getOrderTrackerDetails(req, res) {
+		try {
+			const userId = req.user.id;
+			const { bookingId } = req.params;
+
+			const booking = await Booking.findOne({ _id: bookingId, user: userId })
+				.populate('vendor', 'restaurantName profileImage address gstPercentage contactNumber')
+				.populate('cartSnapshot.items.food', 'foodName foodImage type');
+
+			if (!booking) {
+				return res.status(404).json({
+					success: false,
+					message: 'Order not found'
+				});
+			}
+
+			return res.json({
+				success: true,
+				message: 'Order tracking details retrieved successfully',
+				data: this.formatBookingResponse(booking)
+			});
+		} catch (error) {
+			console.error('Error fetching order tracker details:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to fetch order tracker details',
+				error: error.message
+			});
+		}
+	}
+
+	/**
+	 * Update order status (Vendor only) — strict sequence enforcement
+	 * PATCH /api/vendor/orders/:bookingId/status
+	 */
+	async updateOrderStatus(req, res) {
+		try {
+			const errors = validationResult(req);
+			if (!errors.isEmpty()) {
+				return res.status(400).json({
+					success: false,
+					message: 'Validation failed',
+					errors: errors.array()
+				});
+			}
+
+			const { bookingId } = req.params;
+			const vendorId = req.user.id;
+
+			const booking = await Booking.findOne({
+				_id: bookingId,
+				vendor: vendorId
+			}).populate('vendor', 'restaurantName gstPercentage profileImage');
+
+			if (!booking) {
+				return res.status(404).json({
+					success: false,
+					message: 'Order not found or does not belong to this vendor'
+				});
+			}
+
+			// Payment must be completed before status can advance beyond accepted
+			if (booking.paymentStatus !== 'completed' && booking.orderStatus === 'accepted') {
+				return res.status(400).json({
+					success: false,
+					message: 'Payment must be completed before advancing order status'
+				});
+			}
+
+			if (booking.orderStatus === 'completed') {
+				return res.status(400).json({
+					success: false,
+					message: 'Order is already completed'
+				});
+			}
+
+			if (['rejected', 'timeout'].includes(booking.orderStatus)) {
+				return res.status(400).json({
+					success: false,
+					message: `Cannot update status of a ${booking.orderStatus} order`
+				});
+			}
+
+			// Get the valid next status based on service type group
+			const group = getServiceGroup(booking.serviceType);
+			const transitions = STATUS_TRANSITIONS[group];
+			const nextStatus = transitions[booking.orderStatus];
+
+			if (!nextStatus) {
+				return res.status(400).json({
+					success: false,
+					message: `Cannot advance from current status: ${booking.orderStatus}`
+				});
+			}
+
+			booking.orderStatus = nextStatus;
+			await booking.save();
+
+			const responseData = this.formatBookingResponse(booking);
+
+			// Notify SSE clients watching this booking
+			notifySSEClients(bookingId, {
+				type: 'STATUS_UPDATE',
+				orderStatus: nextStatus,
+				trackingSteps: responseData.trackingSteps,
+				updatedAt: new Date().toISOString()
+			});
+
+			return res.json({
+				success: true,
+				message: `Order status updated to: ${nextStatus}`,
+				data: responseData
+			});
+		} catch (error) {
+			console.error('Error updating order status:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to update order status',
+				error: error.message
+			});
+		}
+	}
+
+	/**
+	 * SSE endpoint for real-time order tracking
+	 * GET /api/bookings/:bookingId/stream
+	 */
+	async streamOrderStatus(req, res) {
+		try {
+			const { bookingId } = req.params;
+			const userId = req.user.id;
+
+			// Verify the booking belongs to this user
+			const booking = await Booking.findOne({ _id: bookingId, user: userId })
+				.populate('vendor', 'restaurantName profileImage address gstPercentage contactNumber');
+
+			if (!booking) {
+				return res.status(404).json({
+					success: false,
+					message: 'Order not found'
+				});
+			}
+
+			// Set SSE headers
+			res.writeHead(200, {
+				'Content-Type': 'text/event-stream',
+				'Cache-Control': 'no-cache',
+				'Connection': 'keep-alive',
+				'X-Accel-Buffering': 'no'
+			});
+
+			// Send initial state
+			const initialData = this.formatBookingResponse(booking);
+			res.write(`data: ${JSON.stringify({ type: 'INITIAL', ...initialData })}\n\n`);
+
+			// Register this client
+			if (!sseClients.has(bookingId)) {
+				sseClients.set(bookingId, new Set());
+			}
+			sseClients.get(bookingId).add(res);
+
+			// Send heartbeat every 30 seconds to keep connection alive
+			const heartbeat = setInterval(() => {
+				try {
+					res.write(': heartbeat\n\n');
+				} catch (err) {
+					clearInterval(heartbeat);
+				}
+			}, 30000);
+
+			// Cleanup on disconnect
+			req.on('close', () => {
+				clearInterval(heartbeat);
+				const clients = sseClients.get(bookingId);
+				if (clients) {
+					clients.delete(res);
+					if (clients.size === 0) {
+						sseClients.delete(bookingId);
+					}
+				}
+			});
+		} catch (error) {
+			console.error('Error setting up SSE stream:', error);
+			if (!res.headersSent) {
+				return res.status(500).json({
+					success: false,
+					message: 'Failed to set up order tracking stream',
+					error: error.message
+				});
+			}
+		}
+	}
 }
 
 const controller = new BookingController();
@@ -632,6 +945,9 @@ module.exports = {
 	getVendorOrders: controller.getVendorOrders.bind(controller),
 	respondToOrder: controller.respondToOrder.bind(controller),
 	confirmPayment: controller.confirmPayment.bind(controller),
-	getVendorActiveOrders: controller.getVendorActiveOrders.bind(controller)
+	getVendorActiveOrders: controller.getVendorActiveOrders.bind(controller),
+	getUserOrders: controller.getUserOrders.bind(controller),
+	getOrderTrackerDetails: controller.getOrderTrackerDetails.bind(controller),
+	updateOrderStatus: controller.updateOrderStatus.bind(controller),
+	streamOrderStatus: controller.streamOrderStatus.bind(controller)
 };
-

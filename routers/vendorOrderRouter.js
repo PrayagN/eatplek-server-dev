@@ -4,9 +4,10 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const {
 	getVendorOrders,
 	respondToOrder,
-	getVendorActiveOrders
+	getVendorActiveOrders,
+	updateOrderStatus
 } = require('../controllers/bookingController');
-const { respondToOrderValidation } = require('../validations/booking.validations');
+const { respondToOrderValidation, updateOrderStatusValidation } = require('../validations/booking.validations');
 
 // Get vendor's active/paid orders
 router.get(
@@ -31,6 +32,15 @@ router.put(
 	requireRole('vendor'),
 	respondToOrderValidation,
 	respondToOrder
+);
+
+// Update order status (strict sequence: accepted → preparing → next → completed)
+router.patch(
+	'/orders/:bookingId/status',
+	authenticateToken,
+	requireRole('vendor'),
+	updateOrderStatusValidation,
+	updateOrderStatus
 );
 
 module.exports = router;

@@ -117,9 +117,19 @@ const respondToOrderValidation = [
 		.withMessage('Item rejection reason cannot exceed 200 characters')
 ];
 
+const updateOrderStatusValidation = [
+	param('bookingId')
+		.exists()
+		.withMessage('Booking ID is required')
+		.bail()
+		.isMongoId()
+		.withMessage('Booking ID must be a valid MongoDB ID')
+];
+
 module.exports = {
 	bookingValidation,
 	respondToOrderValidation,
+	updateOrderStatusValidation,
 	normalizeServiceType
 };
 

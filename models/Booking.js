@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { SERVICE_TYPES, normalizeServiceType } = require('../utils/serviceType');
-const ORDER_STATUSES = ['pending', 'accepted', 'rejected', 'timeout'];
+const ORDER_STATUSES = ['pending', 'accepted', 'rejected', 'timeout', 'preparing', 'out_for_delivery', 'ready_for_pickup', 'served', 'completed'];
 
 const bookingItemAddOnSchema = new mongoose.Schema(
 	{

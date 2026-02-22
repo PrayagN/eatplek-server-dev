@@ -115,6 +115,89 @@
 
 /**
  * @swagger
+ * /api/bookings/my-orders:
+ *   get:
+ *     summary: Get all orders for the authenticated user
+ *     description: Returns a paginated list of past and active orders for the user. Used for the "My Orders" screen.
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: User orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     orders:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/BookingResponse'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/PaginationMeta'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
+
+/**
+ * @swagger
+ * /api/bookings/{bookingId}:
+ *   get:
+ *     summary: Get tracking details for a specific order
+ *     description: Returns comprehensive details for a single order, including full cart snapshot, delivery coordinates, and vendor details. Used for the "Track Your Order" screen.
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the booking to track
+ *     responses:
+ *       200:
+ *         description: Order tracking details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/BookingResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: Order not found
+ */
+
+/**
+ * @swagger
  * /api/bookings/{bookingId}/payment-confirm:
  *   post:
  *     summary: Confirm PhonePe payment for a booking
@@ -178,6 +261,78 @@
 
 /**
  * @swagger
+ * /api/vendor/orders/{bookingId}/status:
+ *   patch:
+ *     summary: Advance order status to the next step
+ *     description: |
+ *       Vendor advances the order to the next status in the strict sequence.
+ *       The sequence depends on the service type:
+ *       - Delivery: accepted → preparing → out_for_delivery → completed
+ *       - Takeaway/Pickup: accepted → preparing → ready_for_pickup → completed
+ *       - Dine in/Car Dine in: accepted → preparing → served → completed
+ *       Payment must be completed before advancing from 'accepted'.
+ *     tags: [Vendor Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the booking to update
+ *     responses:
+ *       200:
+ *         description: Order status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/BookingResponse'
+ *       400:
+ *         description: Invalid status transition or payment not completed
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: Order not found
+ */
+
+/**
+ * @swagger
+ * /api/bookings/{bookingId}/stream:
+ *   get:
+ *     summary: Real-time order status stream (SSE)
+ *     description: |
+ *       Opens a Server-Sent Events (SSE) connection for real-time order status updates.
+ *       The client receives the initial order state immediately, then receives push updates
+ *       whenever the vendor changes the order status. A heartbeat is sent every 30 seconds.
+ *     tags: [Booking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the booking to stream
+ *     responses:
+ *       200:
+ *         description: SSE stream opened successfully (text/event-stream)
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: Order not found
+ */
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     BookingResponse:
@@ -187,7 +342,7 @@
  *           type: string
  *         orderStatus:
  *           type: string
- *           enum: [pending, accepted, rejected, timeout]
+ *           enum: [pending, accepted, rejected, timeout, preparing, out_for_delivery, ready_for_pickup, served, completed]
  *         serviceType:
  *           type: string
  *         isPrebook:
@@ -242,4 +397,20 @@
  *               type: string
  *               format: date-time
  *               nullable: true
+ *         trackingSteps:
+ *           type: array
+ *           description: Service-type-specific tracking steps with completion state
+ *           items:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *               label:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               completed:
+ *                 type: boolean
+ *               active:
+ *                 type: boolean
  */
