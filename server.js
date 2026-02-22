@@ -17,24 +17,24 @@ const connectDB = require('./config/database.js');
 
 // Security middleware
 const {
-	helmetConfig,
-	mongoSanitizeConfig,
-	hppConfig,
-	xssProtection,
-	generalLimiter,
-	authLimiter,
-	otpLimiter,
-	passwordResetLimiter
+  helmetConfig,
+  mongoSanitizeConfig,
+  hppConfig,
+  xssProtection,
+  generalLimiter,
+  authLimiter,
+  otpLimiter,
+  passwordResetLimiter
 } = require('./config/security.js');
 
 // Connect to database
 connectDB().catch((error) => {
-	console.error('Error during startup tasks:', error);
+  console.error('Error during startup tasks:', error);
 });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const hostName = process.env.HOST || "localhost"
+const hostName = process.env.HOST || "0.0.0.0"
 
 // ============================================
 // SECURITY MIDDLEWARE (Applied in order)
@@ -45,7 +45,7 @@ app.use(helmetConfig);
 
 // 2. Trust proxy (if behind reverse proxy like nginx)
 if (process.env.TRUST_PROXY === 'true') {
-	app.set('trust proxy', 1);
+  app.set('trust proxy', 1);
 }
 
 // 3. Rate limiting - Apply general rate limiter to all routes
@@ -66,13 +66,13 @@ app.use(hppConfig);
 
 // 8. Request timeout (30 seconds)
 app.use((req, res, next) => {
-	req.setTimeout(30000, () => {
-		res.status(408).json({
-			success: false,
-			message: 'Request timeout. Please try again.'
-		});
-	});
-	next();
+  req.setTimeout(30000, () => {
+    res.status(408).json({
+      success: false,
+      message: 'Request timeout. Please try again.'
+    });
+  });
+  next();
 });
 
 // ============================================
@@ -90,7 +90,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use(compression());
 
 // CORS configuration
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
@@ -126,7 +126,7 @@ registerRoutes(app, { authLimiter, otpLimiter, passwordResetLimiter });
 app.use(errorHandler);
 
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, hostName, () => {
   console.log(`Server running at ${hostName}:${PORT}/`);
 });
 
