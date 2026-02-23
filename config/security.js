@@ -65,7 +65,7 @@ const helmetConfig = helmet({
 			scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Swagger UI
 			imgSrc: ["'self'", "data:", "https:", "http:"], // Allow images from any source
 			fontSrc: ["'self'", "https://fonts.gstatic.com"],
-			connectSrc: ["'self'"],
+			connectSrc: ["'self'", "https://api-dev.eatplek.com"],
 			frameSrc: ["'self'"]
 		}
 	},
@@ -95,7 +95,7 @@ const hppConfig = hpp({
 // XSS protection - Basic string sanitization
 const sanitizeString = (str) => {
 	if (typeof str !== 'string') return str;
-	
+
 	// Remove potentially dangerous characters and patterns
 	return str
 		.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
@@ -111,12 +111,12 @@ const xssProtection = (req, res, next) => {
 	if (req.body && typeof req.body === 'object') {
 		req.body = sanitizeObject(req.body);
 	}
-	
+
 	// Sanitize query parameters
 	if (req.query && typeof req.query === 'object') {
 		req.query = sanitizeObject(req.query);
 	}
-	
+
 	next();
 };
 
@@ -125,11 +125,11 @@ const sanitizeObject = (obj) => {
 	if (typeof obj !== 'object' || obj === null) {
 		return typeof obj === 'string' ? sanitizeString(obj) : obj;
 	}
-	
+
 	if (Array.isArray(obj)) {
 		return obj.map(item => sanitizeObject(item));
 	}
-	
+
 	const sanitized = {};
 	for (const key in obj) {
 		if (obj.hasOwnProperty(key)) {
