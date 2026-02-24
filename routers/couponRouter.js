@@ -20,6 +20,27 @@ const {
 	applyCouponValidation
 } = require('../validations/coupon.validations');
 
+// User routes for coupon operations
+router.post(
+	'/validate',
+	authenticateToken,
+	validateCouponValidation,
+	validateCoupon
+);
+
+router.post(
+	'/apply',
+	authenticateToken,
+	applyCouponValidation,
+	applyCoupon
+);
+
+router.delete(
+	'/remove',
+	authenticateToken,
+	removeCoupon
+);
+
 // Admin and Vendor routes for managing coupons
 router.post(
 	'/',
@@ -58,27 +79,6 @@ router.delete(
 	requireRole('admin', 'super_admin', 'vendor'),
 	deleteCouponValidation,
 	deleteCoupon
-);
-
-// User routes for coupon operations
-router.post(
-	'/validate',
-	authenticateToken,
-	validateCouponValidation,
-	validateCoupon
-);
-
-router.post(
-	'/apply',
-	authenticateToken,
-	applyCouponValidation,
-	applyCoupon
-);
-
-router.delete(
-	'/remove',
-	authenticateToken,
-	removeCoupon
 );
 
 module.exports = router;
