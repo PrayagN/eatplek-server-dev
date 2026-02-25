@@ -110,7 +110,7 @@ class CartController {
 	async getActualCart(userId) {
 		try {
 			let userCart = await Cart.findOne({ user: userId });
-			
+
 			if (!userCart) {
 				return null;
 			}
@@ -121,14 +121,14 @@ class CartController {
 					.populate('vendor', 'restaurantName profileImage address serviceOffered gstPercentage')
 					.populate('items.food', 'foodName foodImage type');
 				// Note: Don't populate 'user' - we only need the user ID, not the full user object
-				
+
 				if (!connectedCart) {
 					// Connected cart doesn't exist, disconnect
 					userCart.connectedCart = null;
 					await userCart.save();
 					return null;
 				}
-				
+
 				return connectedCart;
 			}
 
@@ -154,13 +154,13 @@ class CartController {
 	 */
 	async getOrCreateUserCart(userId) {
 		let userCart = await Cart.findOne({ user: userId });
-		
+
 		if (!userCart) {
 			// User doesn't have a cart yet, but we need one to connect
 			// This shouldn't normally happen, but handle it gracefully
 			throw new Error('User cart not found. Please create a cart first.');
 		}
-		
+
 		return userCart;
 	}
 
@@ -171,7 +171,7 @@ class CartController {
 	 */
 	async getWorkingCart(userId) {
 		const userCart = await Cart.findOne({ user: userId });
-		
+
 		if (!userCart) {
 			return null;
 		}
@@ -181,7 +181,7 @@ class CartController {
 			const connectedCart = await Cart.findById(userCart.connectedCart)
 				.populate('vendor', 'restaurantName profileImage address serviceOffered gstPercentage')
 				.populate('items.food', 'foodName foodImage type');
-			
+
 			if (!connectedCart) {
 				// Connected cart doesn't exist, disconnect
 				userCart.connectedCart = null;
@@ -240,12 +240,12 @@ class CartController {
 			isPrebookCart,
 			vendor: cart.vendor
 				? {
-						id: (cart.vendor._id || cart.vendor.id)?.toString(),
-						name: cart.vendor.restaurantName,
-						profileImage: cart.vendor.profileImage || null,
-						place: cart.vendor.address?.city || null,
-						gstPercentage: cart.vendor.gstPercentage ?? gstPercentage
-					}
+					id: (cart.vendor._id || cart.vendor.id)?.toString(),
+					name: cart.vendor.restaurantName,
+					profileImage: cart.vendor.profileImage || null,
+					place: cart.vendor.address?.city || null,
+					gstPercentage: cart.vendor.gstPercentage ?? gstPercentage
+				}
 				: null,
 			items: cart.items.map((item) => ({
 				id: item._id?.toString(),
@@ -357,7 +357,7 @@ class CartController {
 			let isRemoveOperation = false;
 			let isSetQuantityOperation = false;
 			let targetQuantity = null;
-			
+
 			if (typeof quantity === 'boolean') {
 				// Boolean: true = increment by 1, false = decrement by 1
 				quantityDelta = quantity ? 1 : -1;
@@ -424,10 +424,10 @@ class CartController {
 
 			// Get the working cart (connected cart if exists, otherwise user's own cart)
 			let cart = await this.getWorkingCart(userId);
-			
+
 			// Check if user has a cart record (to determine if they're connected)
 			const userCart = await Cart.findOne({ user: userId });
-			
+
 			// If user has a cart record but getWorkingCart returned null
 			if (userCart && !cart) {
 				if (userCart.connectedCart) {
@@ -523,8 +523,8 @@ class CartController {
 				}
 				const rawQuantity =
 					typeof customizationInput === 'object' &&
-					customizationInput !== null &&
-					customizationInput.quantity !== undefined
+						customizationInput !== null &&
+						customizationInput.quantity !== undefined
 						? Number(customizationInput.quantity)
 						: 1;
 				const customizationQuantity =
@@ -610,13 +610,13 @@ class CartController {
 				0
 			);
 			const customizationUnitTotal = usesCustomizationPrice ? 0 : customizationUnitBase;
-			
+
 			// Calculate packing charge based on service type
 			// Packing charges apply only for 'take away' and 'delivery'
 			const packingChargePerUnit = PACKING_CHARGE_SERVICE_TYPES.includes(normalizedServiceType)
 				? (food.packingCharges || 0)
 				: 0;
-			
+
 			const absoluteQuantity = Math.abs(quantityDelta);
 			// For new items: use targetQuantity if set, otherwise use absoluteQuantity
 			const quantityForNewItem = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
@@ -629,7 +629,7 @@ class CartController {
 						message: 'Cannot add items. You are connected to a cart, but the connected cart was not found. Please disconnect and reconnect.'
 					});
 				}
-				
+
 				// Create a new cart only if user is not connected
 				cart = new Cart({
 					user: userId,
@@ -750,7 +750,7 @@ class CartController {
 						(custom) =>
 							!removalIds.has(
 								(custom.customizationId?.toString && custom.customizationId.toString()) ||
-									custom.customizationId
+								custom.customizationId
 							)
 					);
 
@@ -802,7 +802,7 @@ class CartController {
 					let customizationsForItem = existingItem.customizations || [];
 					if (hasCustomizationsInput) {
 						const customizationMap = new Map();
-						
+
 						// Add existing customizations to map
 						customizationsForItem.forEach(custom => {
 							const customId = custom.customizationId?.toString() || custom.customizationId;
@@ -815,7 +815,7 @@ class CartController {
 								});
 							}
 						});
-						
+
 						// Merge new customizations into map
 						filteredCustomizations.forEach(custom => {
 							const customId = custom.customizationId?.toString() || custom.customizationId;
@@ -835,7 +835,7 @@ class CartController {
 								}
 							}
 						});
-						
+
 						customizationsForItem = Array.from(customizationMap.values());
 					}
 
@@ -843,7 +843,7 @@ class CartController {
 					let addOnsForItem = existingItem.addOns || [];
 					if (hasAddOnAdditions) {
 						const addOnMap = new Map();
-						
+
 						// Add existing addOns to map
 						addOnsForItem.forEach(addOn => {
 							const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
@@ -856,7 +856,7 @@ class CartController {
 								});
 							}
 						});
-						
+
 						// Merge new addOns into map
 						filteredAddOns.forEach(addOn => {
 							const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
@@ -876,7 +876,7 @@ class CartController {
 								}
 							}
 						});
-						
+
 						addOnsForItem = Array.from(addOnMap.values());
 						addOnsModified = true;
 					}
@@ -908,7 +908,7 @@ class CartController {
 							// If same customization ID exists, update quantity; otherwise add new customization
 							const existingCustomizations = existingItem.customizations || [];
 							const customizationMap = new Map();
-							
+
 							// Add existing customizations to map
 							existingCustomizations.forEach(custom => {
 								const customId = custom.customizationId?.toString() || custom.customizationId;
@@ -921,7 +921,7 @@ class CartController {
 									});
 								}
 							});
-							
+
 							// Merge new customizations into map
 							filteredCustomizations.forEach(custom => {
 								const customId = custom.customizationId?.toString() || custom.customizationId;
@@ -941,10 +941,10 @@ class CartController {
 									}
 								}
 							});
-							
+
 							const mergedCustomizations = Array.from(customizationMap.values());
 							existingItem.customizations = mergedCustomizations;
-							
+
 							// Recalculate effectivePrice if item uses customization price
 							if (existingItem.usesCustomizationPrice) {
 								const mergedCustomizationPrice = this.calculateCustomizationPrice(mergedCustomizations);
@@ -962,7 +962,7 @@ class CartController {
 							} else {
 								// Merge addOns: combine existing and new, summing quantities for same addOnId
 								const addOnMap = new Map();
-								
+
 								// Add existing addOns to map
 								existingAddOns.forEach(addOn => {
 									const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
@@ -975,7 +975,7 @@ class CartController {
 										});
 									}
 								});
-								
+
 								// Merge new addOns into map
 								filteredAddOns.forEach(addOn => {
 									const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
@@ -995,7 +995,7 @@ class CartController {
 										}
 									}
 								});
-								
+
 								existingItem.addOns = Array.from(addOnMap.values());
 								addOnsModified = true;
 							}
@@ -1289,7 +1289,7 @@ class CartController {
 					data: this.formatCartResponse(connectedCart)
 				});
 			}
-			
+
 			// Check if user has items in their own cart (must be empty before connecting)
 			if (userCart && userCart.items && userCart.items.length > 0) {
 				return res.status(400).json({
@@ -1401,6 +1401,79 @@ class CartController {
 			});
 		}
 	}
+
+	async getAvailableAddOns(req, res) {
+		try {
+			const userId = req.user.id;
+			const { itemId } = req.params;
+
+			if (!mongoose.Types.ObjectId.isValid(itemId)) {
+				return res.status(400).json({
+					success: false,
+					message: 'Invalid item ID format'
+				});
+			}
+
+			// Get the working cart
+			const cart = await this.getWorkingCart(userId);
+			if (!cart) {
+				return res.status(404).json({
+					success: false,
+					message: 'Cart not found'
+				});
+			}
+
+			// Find the specific line item in the cart by its item ID
+			const cartItem = cart.items.find((item) => item._id.toString() === itemId);
+			if (!cartItem) {
+				return res.status(404).json({
+					success: false,
+					message: 'Cart item not found'
+				});
+			}
+
+			// Fetch the full food document to get all add-ons defined on the food
+			const food = await Food.findById(cartItem.food).lean();
+			if (!food) {
+				return res.status(404).json({
+					success: false,
+					message: 'Associated food item not found'
+				});
+			}
+
+			// Build a set of add-on IDs already selected for this specific cart item
+			const selectedAddOnIds = new Set(
+				(cartItem.addOns || []).map((a) => a.addOnId.toString())
+			);
+
+			// Return only the add-ons that are NOT yet selected for this cart item
+			const unselectedAddOns = (food.addOns || [])
+				.filter((addOn) => !selectedAddOnIds.has(addOn._id.toString()))
+				.map((addOn) => ({
+					id: addOn._id.toString(),
+					name: addOn.name,
+					price: addOn.price,
+					image: addOn.image || null
+				}));
+
+			return res.json({
+				success: true,
+				message: 'Add-ons retrieved successfully',
+				data: {
+					foodId: food._id.toString(),
+					foodName: food.foodName,
+					addOns: unselectedAddOns
+				}
+			});
+		} catch (error) {
+			console.error('Error fetching add-ons:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to fetch add-ons',
+				error: error.message
+			});
+		}
+	}
 }
 
 const controller = new CartController();
@@ -1411,6 +1484,7 @@ module.exports = {
 	removeItem: controller.removeItem.bind(controller),
 	clearCart: controller.clearCart.bind(controller),
 	connectCart: controller.connectCart.bind(controller),
-	disconnectCart: controller.disconnectCart.bind(controller)
+	disconnectCart: controller.disconnectCart.bind(controller),
+	getAvailableAddOns: controller.getAvailableAddOns.bind(controller)
 };
 

@@ -237,7 +237,68 @@
 
 /**
  * @swagger
- * /api/cart/connect:
+ * /api/cart/items/{itemId}/add-ons:
+ *   get:
+ *     summary: Get unselected add-ons for a cart item
+ *     description: >
+ *       Pass the cart item ID (from `GET /api/cart` items[].id).
+ *       Returns only the add-ons that have NOT yet been selected for that specific cart item.
+ *       Useful for the "Add More" button in the cart UI.
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Cart item ID (from items[].id in GET /api/cart response)
+ *     responses:
+ *       200:
+ *         description: Unselected add-ons retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     foodId:
+ *                       type: string
+ *                     foodName:
+ *                       type: string
+ *                     addOns:
+ *                       type: array
+ *                       description: Add-ons NOT yet selected for this cart item
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           price:
+ *                             type: number
+ *                           image:
+ *                             type: string
+ *                             nullable: true
+ *       400:
+ *         description: Invalid item ID format
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         description: Cart or item not found
+ */
+
+/**
+ * @swagger
+ * /api/cart:
  *   post:
  *     summary: Connect to another user's cart using cart code
  *     description: >
