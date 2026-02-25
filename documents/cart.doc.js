@@ -89,7 +89,13 @@
  *                       example: 2
  *               addOns:
  *                 type: array
- *                 description: Selected add-ons with quantities.
+ *                 description: >
+ *                   Selected add-ons with quantities. This array is always sent by the frontend
+ *                   (even as an empty array when no add-ons are selected).
+ *                   Whether the backend processes this array or ignores it depends on the
+ *                   `updateAddOns` flag and whether the item already exists in the cart.
+ *                   - New item: addOns array is always used regardless of `updateAddOns`
+ *                   - Existing item: addOns array is only processed if `updateAddOns` is true
  *                 items:
  *                   type: object
  *                   required:
@@ -97,50 +103,121 @@
  *                   properties:
  *                     addOnId:
  *                       type: string
- *                       description: Add-on ID (optional)
+ *                       description: Add-on ID
  *                     quantity:
  *                       type: integer
- *                       minimum: 1
+ *                       minimum: 0
  *                       maximum: 10
  *                       default: 1
- *                       description: Quantity of this add-on
+ *                       description: >
+ *                         Quantity of this add-on. Set to 0 to remove this add-on from the cart item
+ *                         (only works when updateAddOns is true).
  *                       example: 2
+ *               updateAddOns:
+ *                 type: boolean
+ *                 default: false
+ *                 description: >
+ *                   Controls whether the backend should update the add-ons of an existing cart item.
+ *
+ *                   **When to send `true`:** Only when the user explicitly increases or decreases
+ *                   an add-on quantity, adds a new add-on, or removes an add-on from an existing cart item.
+ *
+ *                   **When NOT to send (or send `false`):** When the user taps the item "+" or "-"
+ *                   button to change item quantity. Even if the frontend echoes back the current
+ *                   add-ons in the request, the backend will ignore them and leave stored
+ *                   add-on quantities unchanged.
+ *
+ *                   **New items:** This flag is ignored for new items — add-ons are always
+ *                   saved as sent.
+ *
+ *                   | User Action | `updateAddOns` |
+ *                   |---|---|
+ *                   | Tap "+" on item in cart | `false` or omit |
+ *                   | Tap "-" on item in cart | `false` or omit |
+ *                   | Add new item to cart | omit (ignored) |
+ *                   | Tap "+" on an add-on | `true` |
+ *                   | Tap "-" on an add-on | `true` |
+ *                   | Add a new add-on to existing item | `true` |
+ *                   | Remove an add-on from existing item | `true` |
  *               notes:
  *                 type: string
  *                 maxLength: 500
  *                 description: Optional special instructions stored per cart line
  *           examples:
- *             setQuantity:
- *               summary: Set quantity to 10
- *               value:
- *                 foodId: "507f1f77bcf86cd799439011"
- *                 quantity: 10
- *                 serviceType: "dine in"
- *                 customizations:
- *                   - customizationId: "507f1f77bcf86cd799439012"
- *                     quantity: 2
- *                 addOns:
- *                   - addOnId: "507f1f77bcf86cd799439013"
- *                     quantity: 1
- *                 notes: "Extra spicy please"
- *             increment:
- *               summary: Increment by 1 (boolean)
+ *             incrementItem:
+ *               summary: Increment item quantity only (add-ons untouched even if sent)
  *               value:
  *                 foodId: "507f1f77bcf86cd799439011"
  *                 quantity: true
  *                 serviceType: "delivery"
+ *                 addOns:
+ *                   - addOnId: "507f1f77bcf86cd799439013"
+ *                     quantity: 2
+ *             incrementItemNoAddOns:
+ *               summary: Increment item quantity (no add-ons)
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: true
+ *                 serviceType: "delivery"
+ *                 addOns: []
+ *             newItemWithAddOns:
+ *               summary: Add new item with add-ons (updateAddOns not needed for new items)
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: true
+ *                 serviceType: "delivery"
+ *                 addOns:
+ *                   - addOnId: "507f1f77bcf86cd799439013"
+ *                     quantity: 2
+ *                 notes: "Extra spicy please"
+ *             newItemNoAddOns:
+ *               summary: Add new item without add-ons
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: true
+ *                 serviceType: "delivery"
+ *                 addOns: []
+ *             updateAddOnQuantity:
+ *               summary: Update add-on quantity on existing cart item (updateAddOns must be true)
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: true
+ *                 serviceType: "delivery"
+ *                 addOns:
+ *                   - addOnId: "507f1f77bcf86cd799439013"
+ *                     quantity: 3
+ *                 updateAddOns: true
+ *             removeAddOn:
+ *               summary: Remove a specific add-on from existing cart item (quantity 0 + updateAddOns true)
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: true
+ *                 serviceType: "delivery"
+ *                 addOns:
+ *                   - addOnId: "507f1f77bcf86cd799439013"
+ *                     quantity: 0
+ *                 updateAddOns: true
+ *             setQuantity:
+ *               summary: Set item quantity to specific value
+ *               value:
+ *                 foodId: "507f1f77bcf86cd799439011"
+ *                 quantity: 10
+ *                 serviceType: "dine in"
+ *                 addOns: []
  *             remove:
  *               summary: Remove item (quantity = 0)
  *               value:
  *                 foodId: "507f1f77bcf86cd799439011"
  *                 quantity: 0
  *                 serviceType: "dine in"
+ *                 addOns: []
  *             removeCustomization:
  *               summary: Remove customized line item (customization quantity = 0)
  *               value:
  *                 foodId: "507f1f77bcf86cd799439011"
  *                 quantity: 1
  *                 serviceType: "dine in"
+ *                 addOns: []
  *                 customizations:
  *                   - customizationId: "507f1f77bcf86cd799439012"
  *                     quantity: 0
@@ -150,6 +227,7 @@
  *                 foodId: "507f1f77bcf86cd799439099"
  *                 quantity: 1
  *                 serviceType: "take away"
+ *                 addOns: []
  *                 notes: "Prebooked for tomorrow"
  *     responses:
  *       201:
@@ -463,6 +541,7 @@
  *               quantity:
  *                 type: integer
  *                 default: 1
+ *                 description: Per-unit quantity of this add-on. This value is independent of item quantity and only changes when updateAddOns is true.
  *         itemTotal:
  *           type: number
  *         notes:
@@ -541,4 +620,3 @@
  *           type: string
  *           format: date-time
  */
-
