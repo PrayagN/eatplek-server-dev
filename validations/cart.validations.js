@@ -30,28 +30,28 @@ const addToCartValidation = [
 		.isArray({ max: 20 }).withMessage('customizations must be an array'),
 	body('customizations.*')
 		.optional()
-	.custom((value) => {
-		if (typeof value === 'string') {
-			if (!mongoose.Types.ObjectId.isValid(value)) {
-				throw new Error('Each customization must be a valid ID');
+		.custom((value) => {
+			if (typeof value === 'string') {
+				if (!mongoose.Types.ObjectId.isValid(value)) {
+					throw new Error('Each customization must be a valid ID');
+				}
+				return true;
 			}
-			return true;
-		}
 
-		if (typeof value === 'object' && value !== null) {
-			if (!mongoose.Types.ObjectId.isValid(value.customizationId || value.id)) {
-				throw new Error('customizationId must be a valid ID');
+			if (typeof value === 'object' && value !== null) {
+				if (!mongoose.Types.ObjectId.isValid(value.customizationId || value.id)) {
+					throw new Error('customizationId must be a valid ID');
+				}
+				if (
+					value.quantity !== undefined &&
+					(!Number.isInteger(value.quantity) || value.quantity < 0 || value.quantity > 10)
+				) {
+					throw new Error('customization quantity must be between 0 and 10');
+				}
+				return true;
 			}
-			if (
-				value.quantity !== undefined &&
-				(!Number.isInteger(value.quantity) || value.quantity < 0 || value.quantity > 10)
-			) {
-				throw new Error('customization quantity must be between 0 and 10');
-			}
-			return true;
-		}
 
-		throw new Error('Each customization must be an ID or object');
+			throw new Error('Each customization must be an ID or object');
 		}),
 	body('addOns')
 		.optional()
@@ -70,17 +70,21 @@ const addToCartValidation = [
 				if (!mongoose.Types.ObjectId.isValid(value.addOnId || value.id)) {
 					throw new Error('addOnId must be a valid ID');
 				}
-			if (
-				value.quantity !== undefined &&
-				(!Number.isInteger(value.quantity) || value.quantity < 0 || value.quantity > 10)
-			) {
-				throw new Error('add-on quantity must be between 0 and 10');
+				if (
+					value.quantity !== undefined &&
+					(!Number.isInteger(value.quantity) || value.quantity < 0 || value.quantity > 10)
+				) {
+					throw new Error('add-on quantity must be between 0 and 10');
 				}
 				return true;
 			}
 
 			throw new Error('Each add-on must be an ID or object');
 		}),
+	body('updateAddOns')
+		.optional()
+		.isBoolean().withMessage('updateAddOns must be a boolean')
+		.toBoolean(),
 	body('notes')
 		.optional()
 		.isString().withMessage('notes must be text')
