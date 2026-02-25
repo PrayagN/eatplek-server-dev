@@ -242,7 +242,7 @@
  *     summary: Get unselected add-ons for a cart item
  *     description: >
  *       Pass the cart item ID (from `GET /api/cart` items[].id).
- *       Returns only the add-ons that have NOT yet been selected for that specific cart item.
+ *       Returns add-ons and customizations that have NOT yet been selected for that specific cart item.
  *       Useful for the "Add More" button in the cart UI.
  *     tags: [Cart]
  *     security:

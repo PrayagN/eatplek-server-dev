@@ -1446,6 +1446,11 @@ class CartController {
 				(cartItem.addOns || []).map((a) => a.addOnId.toString())
 			);
 
+			// Build a set of customization IDs already selected for this specific cart item
+			const selectedCustomizationIds = new Set(
+				(cartItem.customizations || []).map((c) => c.customizationId.toString())
+			);
+
 			// Return only the add-ons that are NOT yet selected for this cart item
 			const unselectedAddOns = (food.addOns || [])
 				.filter((addOn) => !selectedAddOnIds.has(addOn._id.toString()))
@@ -1456,13 +1461,23 @@ class CartController {
 					image: addOn.image || null
 				}));
 
+			// Return only the customizations that are NOT yet selected for this cart item
+			const unselectedCustomizations = (food.customizations || [])
+				.filter((c) => !selectedCustomizationIds.has(c._id.toString()))
+				.map((c) => ({
+					id: c._id.toString(),
+					name: c.name,
+					price: c.price
+				}));
+
 			return res.json({
 				success: true,
-				message: 'Add-ons retrieved successfully',
+				message: 'Add-ons and customizations retrieved successfully',
 				data: {
 					foodId: food._id.toString(),
 					foodName: food.foodName,
-					addOns: unselectedAddOns
+					addOns: unselectedAddOns,
+					customizations: unselectedCustomizations
 				}
 			});
 		} catch (error) {
