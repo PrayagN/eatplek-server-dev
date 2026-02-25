@@ -329,6 +329,797 @@ class CartController {
 		}
 	}
 
+	// async addItem(req, res) {
+	// 	try {
+	// 		const errors = validationResult(req);
+	// 		if (!errors.isEmpty()) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: 'Validation failed',
+	// 				errors: errors.array()
+	// 			});
+	// 		}
+
+	// 		const userId = req.user.id;
+	// 		const {
+	// 			foodId,
+	// 			quantity = true,
+	// 			serviceType,
+	// 			customizations = [],
+	// 			addOns = [],
+	// 			notes
+	// 		} = req.body;
+
+	// 		const hasCustomizationsInput = Object.prototype.hasOwnProperty.call(req.body, 'customizations');
+
+	// 		let quantityDelta;
+	// 		let isIncrementOperation = true;
+	// 		let isRemoveOperation = false;
+	// 		let isSetQuantityOperation = false;
+	// 		let targetQuantity = null;
+
+	// 		if (typeof quantity === 'boolean') {
+	// 			// Boolean: true = increment by 1, false = decrement by 1
+	// 			quantityDelta = quantity ? 1 : -1;
+	// 			isIncrementOperation = quantity;
+	// 		} else {
+	// 			const parsedQuantity = Number(quantity);
+	// 			if (!Number.isFinite(parsedQuantity)) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Quantity must be boolean, 0, or a positive number'
+	// 				});
+	// 			}
+	// 			if (parsedQuantity === 0) {
+	// 				// quantity = 0 means remove item
+	// 				isRemoveOperation = true;
+	// 				quantityDelta = 0;
+	// 			} else if (parsedQuantity < 0) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Quantity cannot be negative. Use 0 to remove item.'
+	// 				});
+	// 			} else {
+	// 				// Number > 0: SET quantity to this value (not add)
+	// 				targetQuantity = Math.floor(parsedQuantity);
+	// 				isSetQuantityOperation = true;
+	// 				quantityDelta = targetQuantity; // Keep for backward compatibility in calculations
+	// 			}
+	// 		}
+
+	// 		const normalizedServiceType = normalizeServiceType(serviceType);
+	// 		if (!normalizedServiceType) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: 'Invalid serviceType. Allowed values: Dine in, Delivery, Takeaway, Pickup, Car Dine in'
+	// 			});
+	// 		}
+
+	// 		const food = await Food.findOne({ _id: foodId, isActive: true }).lean();
+	// 		if (!food) {
+	// 			return res.status(404).json({
+	// 				success: false,
+	// 				message: 'Food item not found'
+	// 			});
+	// 		}
+
+	// 		// Normalize food's orderTypes to handle old format values in database
+	// 		const normalizedOrderTypes = (food.orderTypes || []).map(type => normalizeServiceType(type) || type);
+	// 		if (!normalizedOrderTypes.includes(normalizedServiceType)) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: `Food item is not available for ${normalizedServiceType}`
+	// 			});
+	// 		}
+
+	// 		const isPrebookFood = Boolean(food.isPrebook);
+	// 		const vendorDoc = await Vendor.findById(food.vendor).select('gstPercentage');
+	// 		if (!vendorDoc) {
+	// 			return res.status(404).json({
+	// 				success: false,
+	// 				message: 'Vendor associated with this food item was not found'
+	// 			});
+	// 		}
+	// 		const vendorGstPercentage = Number(vendorDoc.gstPercentage) || 0;
+
+	// 		// Get the working cart (connected cart if exists, otherwise user's own cart)
+	// 		let cart = await this.getWorkingCart(userId);
+
+	// 		// Check if user has a cart record (to determine if they're connected)
+	// 		const userCart = await Cart.findOne({ user: userId });
+
+	// 		// If user has a cart record but getWorkingCart returned null
+	// 		if (userCart && !cart) {
+	// 			if (userCart.connectedCart) {
+	// 				// User is connected but connected cart doesn't exist or is invalid
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Connected cart is invalid. Please disconnect and reconnect to a cart.'
+	// 				});
+	// 			}
+	// 			// User has an empty cart - allow creating new one below
+	// 		}
+
+	// 		// Get vendor IDs for comparison (handle both populated and non-populated vendor)
+	// 		const cartVendorId = cart ? this.getVendorId(cart.vendor) : null;
+	// 		const foodVendorId = this.getVendorId(food.vendor);
+
+	// 		if (cart && cartVendorId && cartVendorId !== foodVendorId) {
+	// 			return res.status(409).json({
+	// 				success: false,
+	// 				message: 'Cart contains items from another vendor. Please clear cart to switch vendors.'
+	// 			});
+	// 		}
+
+	// 		// Normalize cart's serviceType for comparison (handles old format in database)
+	// 		const cartServiceTypeNormalized = cart ? normalizeServiceType(cart.serviceType) || cart.serviceType : null;
+	// 		if (cart && cartServiceTypeNormalized !== normalizedServiceType) {
+	// 			return res.status(409).json({
+	// 				success: false,
+	// 				message: 'You cannot mix different service types in one cart'
+	// 			});
+	// 		}
+
+	// 		const cartHasPrebook = cart?.items?.some((item) => item.isPrebook) || false;
+	// 		const cartHasRegular = cart?.items?.some((item) => !item.isPrebook) || false;
+
+	// 		if (cart) {
+	// 			if (isPrebookFood && cartHasRegular) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Cart already contains regular items. Remove them before adding a prebook item.'
+	// 				});
+	// 			}
+	// 			if (!isPrebookFood && cartHasPrebook) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Cart already contains a prebook item. Remove it before adding regular items.'
+	// 				});
+	// 			}
+	// 		}
+
+	// 		const foodHasCustomizations = Array.isArray(food.customizations) && food.customizations.length > 0;
+	// 		const customizationInputs = Array.isArray(customizations) ? customizations : [];
+	// 		const customizationRemovalRequested =
+	// 			hasCustomizationsInput && this.isCustomizationRemovalRequest(customizationInputs);
+
+	// 		if (foodHasCustomizations && !customizationRemovalRequested) {
+	// 			if (customizationInputs.length === 0) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'This food requires selecting at least one customization option.'
+	// 				});
+	// 			}
+
+	// 			const customizationInputMissingDetails = customizationInputs.some((input) => {
+	// 				if (!input || typeof input !== 'object') {
+	// 					return true;
+	// 				}
+
+	// 				const hasId = Boolean(input.customizationId || input.id);
+	// 				const hasQuantity = input.quantity !== undefined && input.quantity !== null;
+	// 				return !hasId || !hasQuantity;
+	// 			});
+
+	// 			if (customizationInputMissingDetails) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Customization id and quantity are required for this food.'
+	// 				});
+	// 			}
+	// 		}
+
+	// 		const resolvedCustomizations = customizationInputs.map((customizationInput) => {
+	// 			const customizationId =
+	// 				typeof customizationInput === 'string'
+	// 					? customizationInput
+	// 					: customizationInput?.customizationId || customizationInput?.id || null;
+	// 			if (!mongoose.Types.ObjectId.isValid(customizationId)) {
+	// 				return null;
+	// 			}
+	// 			const customization = food.customizations?.find((c) => c._id.toString() === customizationId);
+	// 			if (!customization) {
+	// 				return null;
+	// 			}
+	// 			const rawQuantity =
+	// 				typeof customizationInput === 'object' &&
+	// 					customizationInput !== null &&
+	// 					customizationInput.quantity !== undefined
+	// 					? Number(customizationInput.quantity)
+	// 					: 1;
+	// 			const customizationQuantity =
+	// 				Number.isFinite(rawQuantity) && rawQuantity >= 0 ? Math.floor(rawQuantity) : 1;
+	// 			return {
+	// 				customizationId: customization._id,
+	// 				name: customization.name,
+	// 				price: customization.price,
+	// 				quantity: customizationQuantity
+	// 			};
+	// 		});
+
+	// 		if (resolvedCustomizations.some((entry) => entry === null)) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: 'Invalid customization selected'
+	// 			});
+	// 		}
+	// 		const filteredCustomizations = resolvedCustomizations.filter((entry) => entry && entry.quantity > 0);
+	// 		const customizationSignaturePayload = customizationRemovalRequested
+	// 			? resolvedCustomizations.filter(Boolean)
+	// 			: filteredCustomizations;
+
+	// 		if (foodHasCustomizations && filteredCustomizations.length === 0 && !customizationRemovalRequested) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: 'Valid customization selection is required for this food.'
+	// 			});
+	// 		}
+
+	// 		const resolvedAddOns = (addOns || []).map((addOnInput) => {
+	// 			const addOnId =
+	// 				typeof addOnInput === 'string'
+	// 					? addOnInput
+	// 					: addOnInput?.addOnId || addOnInput?.id || null;
+
+	// 			if (!mongoose.Types.ObjectId.isValid(addOnId)) {
+	// 				return null;
+	// 			}
+
+	// 			const addOn = food.addOns?.find((a) => a._id.toString() === addOnId);
+	// 			if (!addOn) {
+	// 				return null;
+	// 			}
+
+	// 			const rawQuantity =
+	// 				typeof addOnInput === 'object' && addOnInput !== null && addOnInput.quantity !== undefined
+	// 					? Number(addOnInput.quantity)
+	// 					: 1;
+	// 			const sanitizedQuantity =
+	// 				Number.isFinite(rawQuantity) && rawQuantity >= 0 ? Math.floor(rawQuantity) : 1;
+
+	// 			return {
+	// 				addOnId: addOn._id,
+	// 				name: addOn.name,
+	// 				price: addOn.price,
+	// 				quantity: sanitizedQuantity
+	// 			};
+	// 		});
+
+	// 		if (resolvedAddOns.some((entry) => entry === null)) {
+	// 			return res.status(400).json({
+	// 				success: false,
+	// 				message: 'Invalid add-on selected'
+	// 			});
+	// 		}
+	// 		const addOnsMarkedForRemoval = resolvedAddOns.filter((entry) => entry && entry.quantity === 0);
+	// 		const filteredAddOns = resolvedAddOns.filter((entry) => entry && entry.quantity > 0);
+	// 		const hasAddOnRemovals = addOnsMarkedForRemoval.length > 0;
+	// 		const hasAddOnAdditions = filteredAddOns.length > 0;
+	// 		let addOnsModified = false;
+
+	// 		// Calculate pricing with current date/time for day offers
+	// 		const pricing = calculateFoodPricing(food, { currentDate: new Date() });
+
+	// 		const customizationUnitBase = this.calculateCustomizationPrice(filteredCustomizations);
+	// 		const usesCustomizationPrice = foodHasCustomizations;
+	// 		const effectivePrice = usesCustomizationPrice ? customizationUnitBase : pricing.finalPrice;
+	// 		const normalizedDiscountPrice = usesCustomizationPrice ? null : pricing.discountPrice;
+
+	// 		const addOnOrderTotal = filteredAddOns.reduce(
+	// 			(sum, addOn) => sum + addOn.price * (addOn.quantity || 1),
+	// 			0
+	// 		);
+	// 		const customizationUnitTotal = usesCustomizationPrice ? 0 : customizationUnitBase;
+
+	// 		// Calculate packing charge based on service type
+	// 		// Packing charges apply only for 'take away' and 'delivery'
+	// 		const packingChargePerUnit = PACKING_CHARGE_SERVICE_TYPES.includes(normalizedServiceType)
+	// 			? (food.packingCharges || 0)
+	// 			: 0;
+
+	// 		const absoluteQuantity = Math.abs(quantityDelta);
+	// 		// For new items: use targetQuantity if set, otherwise use absoluteQuantity
+	// 		const quantityForNewItem = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
+
+	// 		if (!cart) {
+	// 			// Check if user is connected before creating a new cart
+	// 			if (userCart && userCart.connectedCart) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Cannot add items. You are connected to a cart, but the connected cart was not found. Please disconnect and reconnect.'
+	// 				});
+	// 			}
+
+	// 			// Create a new cart only if user is not connected
+	// 			cart = new Cart({
+	// 				user: userId,
+	// 				vendor: food.vendor,
+	// 				serviceType: normalizedServiceType,
+	// 				isPrebookCart: isPrebookFood,
+	// 				gstPercentage: vendorGstPercentage,
+	// 				items: [],
+	// 				totals: {}
+	// 			});
+	// 		} else {
+	// 			cart.gstPercentage = vendorGstPercentage;
+	// 		}
+
+	// 		const selectionSignatureOptions = {
+	// 			ignoreCustomizationQuantity: foodHasCustomizations,
+	// 			ignoreAddOnQuantity: true
+	// 		};
+
+	// 		const selectionSignature = this.buildSelectionSignature(
+	// 			foodId,
+	// 			customizationSignaturePayload,
+	// 			filteredAddOns,
+	// 			selectionSignatureOptions
+	// 		);
+
+	// 		// First, try to find exact match (same food, customizations, and addOns)
+	// 		// This is for incrementing quantity of the exact same item
+	// 		let existingItem = cart.items.find((item) => {
+	// 			const signature = this.buildSelectionSignature(
+	// 				this.getFoodId(item.food),
+	// 				item.customizations,
+	// 				item.addOns,
+	// 				{
+	// 					ignoreCustomizationQuantity: Boolean(item.usesCustomizationPrice),
+	// 					ignoreAddOnQuantity: true
+	// 				}
+	// 			);
+	// 			return signature === selectionSignature;
+	// 		});
+
+	// 		// If no exact match found, find item with same foodId only
+	// 		// This allows merging customizations/addOns into existing items when same food is added multiple times
+	// 		if (!existingItem && cart.items.length > 0) {
+	// 			existingItem = cart.items.find((item) => {
+	// 				const currentItemFoodId = this.getFoodId(item.food);
+	// 				// Simply match by foodId - we'll merge customizations and addOns below
+	// 				return currentItemFoodId.toString() === foodId.toString();
+	// 			});
+	// 		}
+
+	// 		if (!existingItem && hasAddOnRemovals) {
+	// 			existingItem = cart.items.find((item) => {
+	// 				const currentItemFoodId = this.getFoodId(item.food);
+	// 				if (currentItemFoodId.toString() !== foodId.toString()) {
+	// 					return false;
+	// 				}
+	// 				const itemAddOnIds = (item.addOns || []).map((addOn) => addOn.addOnId?.toString() || addOn.addOnId);
+	// 				return addOnsMarkedForRemoval.some((entry) => itemAddOnIds.includes(entry.addOnId.toString()));
+	// 			});
+	// 		}
+
+	// 		if (hasAddOnRemovals) {
+	// 			if (!existingItem) {
+	// 				return res.status(404).json({
+	// 					success: false,
+	// 					message: 'Cannot remove add-ons. Cart item not found.'
+	// 				});
+	// 			}
+	// 			const removalIds = new Set(addOnsMarkedForRemoval.map((entry) => entry.addOnId.toString()));
+	// 			const existingAddOnsList = existingItem.addOns || [];
+	// 			const filteredExistingAddOns = existingAddOnsList.filter(
+	// 				(addOn) => !removalIds.has(addOn.addOnId?.toString() || addOn.addOnId)
+	// 			);
+	// 			if (filteredExistingAddOns.length === existingAddOnsList.length) {
+	// 				return res.status(404).json({
+	// 					success: false,
+	// 					message: 'Cannot remove add-ons. Selected add-ons were not found in cart item.'
+	// 				});
+	// 			}
+	// 			existingItem.addOns = filteredExistingAddOns;
+	// 			addOnsModified = true;
+	// 		}
+
+	// 		if (isPrebookFood && cart) {
+	// 			const otherPrebookItem = cart.items.find(
+	// 				(item) =>
+	// 					item.isPrebook &&
+	// 					(!existingItem || item._id.toString() !== existingItem._id?.toString())
+	// 			);
+	// 			if (otherPrebookItem) {
+	// 				return res.status(400).json({
+	// 					success: false,
+	// 					message: 'Only one prebook item can exist in the cart at a time. Remove the existing prebook item to add another.'
+	// 				});
+	// 			}
+	// 		}
+
+	// 		if (customizationRemovalRequested) {
+	// 			if (!existingItem) {
+	// 				return res.status(404).json({
+	// 					success: false,
+	// 					message: 'Cannot remove customization. Cart item not found.'
+	// 				});
+	// 			}
+
+	// 			// Remove only the requested customizations (quantity = 0)
+	// 			const customizationsMarkedForRemoval = resolvedCustomizations.filter(
+	// 				(entry) => entry && entry.quantity === 0
+	// 			);
+
+	// 			if (customizationsMarkedForRemoval.length > 0) {
+	// 				const removalIds = new Set(
+	// 					customizationsMarkedForRemoval.map((entry) => entry.customizationId.toString())
+	// 				);
+	// 				const existingList = existingItem.customizations || [];
+	// 				const filteredExisting = existingList.filter(
+	// 					(custom) =>
+	// 						!removalIds.has(
+	// 							(custom.customizationId?.toString && custom.customizationId.toString()) ||
+	// 							custom.customizationId
+	// 						)
+	// 				);
+
+	// 				// If nothing changed, customization wasn't found on the item
+	// 				if (filteredExisting.length === existingList.length) {
+	// 					return res.status(404).json({
+	// 						success: false,
+	// 						message: 'Cannot remove customization. Selected customization was not found in cart item.'
+	// 					});
+	// 				}
+
+	// 				existingItem.customizations = filteredExisting;
+
+	// 				// If no customizations remain and item pricing depends on customizations,
+	// 				// remove the entire item from cart
+	// 				if ((existingItem.customizations || []).length === 0 && existingItem.usesCustomizationPrice) {
+	// 					cart.items = cart.items.filter(
+	// 						(item) => item._id.toString() !== existingItem._id.toString()
+	// 					);
+	// 				} else {
+	// 					// Recalculate totals for the updated item
+	// 					if (existingItem.usesCustomizationPrice) {
+	// 						const mergedCustomizationPrice = this.calculateCustomizationPrice(
+	// 							existingItem.customizations || []
+	// 						);
+	// 						existingItem.effectivePrice = mergedCustomizationPrice;
+	// 					}
+	// 					this.updateCartItemTotals(existingItem);
+	// 				}
+	// 			}
+	// 		}
+
+	// 		// Handle remove operation (quantity = 0)
+	// 		if (isRemoveOperation) {
+	// 			if (!existingItem) {
+	// 				return res.status(404).json({
+	// 					success: false,
+	// 					message: 'Cannot remove. Cart item not found.'
+	// 				});
+	// 			}
+	// 			cart.items = cart.items.filter((item) => item._id.toString() !== existingItem._id.toString());
+	// 		} else {
+	// 			let customizationHandled = false;
+
+	// 			if (existingItem && usesCustomizationPrice) {
+	// 				customizationHandled = true;
+
+	// 				// Merge customizations instead of replacing
+	// 				let customizationsForItem = existingItem.customizations || [];
+	// 				if (hasCustomizationsInput) {
+	// 					const customizationMap = new Map();
+
+	// 					// Add existing customizations to map
+	// 					customizationsForItem.forEach(custom => {
+	// 						const customId = custom.customizationId?.toString() || custom.customizationId;
+	// 						if (customId) {
+	// 							customizationMap.set(customId, {
+	// 								customizationId: custom.customizationId,
+	// 								name: custom.name,
+	// 								price: custom.price,
+	// 								quantity: custom.quantity || 1
+	// 							});
+	// 						}
+	// 					});
+
+	// 					// Merge new customizations into map
+	// 					filteredCustomizations.forEach(custom => {
+	// 						const customId = custom.customizationId?.toString() || custom.customizationId;
+	// 						if (customId) {
+	// 							const existing = customizationMap.get(customId);
+	// 							if (existing) {
+	// 								// Same customization ID: update quantity (replace, not add)
+	// 								existing.quantity = custom.quantity || 1;
+	// 							} else {
+	// 								// New customization: add it
+	// 								customizationMap.set(customId, {
+	// 									customizationId: custom.customizationId,
+	// 									name: custom.name,
+	// 									price: custom.price,
+	// 									quantity: custom.quantity || 1
+	// 								});
+	// 							}
+	// 						}
+	// 					});
+
+	// 					customizationsForItem = Array.from(customizationMap.values());
+	// 				}
+
+	// 				// Merge addOns instead of replacing
+	// 				let addOnsForItem = existingItem.addOns || [];
+	// 				if (hasAddOnAdditions) {
+	// 					const addOnMap = new Map();
+
+	// 					// Add existing addOns to map
+	// 					addOnsForItem.forEach(addOn => {
+	// 						const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
+	// 						if (addOnId) {
+	// 							addOnMap.set(addOnId, {
+	// 								addOnId: addOn.addOnId,
+	// 								name: addOn.name,
+	// 								price: addOn.price,
+	// 								quantity: addOn.quantity || 1
+	// 							});
+	// 						}
+	// 					});
+
+	// 					// Merge new addOns into map
+	// 					filteredAddOns.forEach(addOn => {
+	// 						const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
+	// 						if (addOnId) {
+	// 							const existing = addOnMap.get(addOnId);
+	// 							if (existing) {
+	// 								// Same addOn ID: add quantities
+	// 								existing.quantity = (existing.quantity || 1) + (addOn.quantity || 1);
+	// 							} else {
+	// 								// New addOn: add it
+	// 								addOnMap.set(addOnId, {
+	// 									addOnId: addOn.addOnId,
+	// 									name: addOn.name,
+	// 									price: addOn.price,
+	// 									quantity: addOn.quantity || 1
+	// 								});
+	// 							}
+	// 						}
+	// 					});
+
+	// 					addOnsForItem = Array.from(addOnMap.values());
+	// 					addOnsModified = true;
+	// 				}
+
+	// 				existingItem.customizations = customizationsForItem;
+	// 				existingItem.addOns = addOnsForItem;
+	// 				existingItem.quantity = 1;
+	// 				existingItem.usesCustomizationPrice = true;
+	// 				existingItem.discountPrice = null;
+	// 				existingItem.packingCharge = packingChargePerUnit;
+	// 				existingItem.isPrebook = isPrebookFood;
+
+	// 				const customizationPrice = this.calculateCustomizationPrice(customizationsForItem);
+	// 				existingItem.effectivePrice = customizationPrice;
+	// 				this.updateCartItemTotals(existingItem);
+	// 			}
+
+	// 			if (!customizationHandled) {
+	// 				if (!existingItem && !isIncrementOperation && !isSetQuantityOperation) {
+	// 					return res.status(404).json({
+	// 						success: false,
+	// 						message: 'Cannot decrement. Cart item not found.'
+	// 					});
+	// 				}
+
+	// 				if (existingItem) {
+	// 					if (hasCustomizationsInput) {
+	// 						// Always merge customizations: add new customizations to existing ones
+	// 						// If same customization ID exists, update quantity; otherwise add new customization
+	// 						const existingCustomizations = existingItem.customizations || [];
+	// 						const customizationMap = new Map();
+
+	// 						// Add existing customizations to map
+	// 						existingCustomizations.forEach(custom => {
+	// 							const customId = custom.customizationId?.toString() || custom.customizationId;
+	// 							if (customId) {
+	// 								customizationMap.set(customId, {
+	// 									customizationId: custom.customizationId,
+	// 									name: custom.name,
+	// 									price: custom.price,
+	// 									quantity: custom.quantity || 1
+	// 								});
+	// 							}
+	// 						});
+
+	// 						// Merge new customizations into map
+	// 						filteredCustomizations.forEach(custom => {
+	// 							const customId = custom.customizationId?.toString() || custom.customizationId;
+	// 							if (customId) {
+	// 								const existing = customizationMap.get(customId);
+	// 								if (existing) {
+	// 									// Same customization ID: update quantity (replace, not add)
+	// 									existing.quantity = custom.quantity || 1;
+	// 								} else {
+	// 									// New customization: add it
+	// 									customizationMap.set(customId, {
+	// 										customizationId: custom.customizationId,
+	// 										name: custom.name,
+	// 										price: custom.price,
+	// 										quantity: custom.quantity || 1
+	// 									});
+	// 								}
+	// 							}
+	// 						});
+
+	// 						const mergedCustomizations = Array.from(customizationMap.values());
+	// 						existingItem.customizations = mergedCustomizations;
+
+	// 						// Recalculate effectivePrice if item uses customization price
+	// 						if (existingItem.usesCustomizationPrice) {
+	// 							const mergedCustomizationPrice = this.calculateCustomizationPrice(mergedCustomizations);
+	// 							existingItem.effectivePrice = mergedCustomizationPrice;
+	// 						}
+	// 					}
+	// 					if (hasAddOnAdditions) {
+	// 						// Merge addOns: if existing item has no addOns, use the new ones
+	// 						// If both have addOns, merge by addOnId (add quantities if same addOn, otherwise add new)
+	// 						const existingAddOns = existingItem.addOns || [];
+	// 						if (existingAddOns.length === 0) {
+	// 							// Existing item has no addOns, use the new ones
+	// 							existingItem.addOns = filteredAddOns;
+	// 							addOnsModified = true;
+	// 						} else {
+	// 							// Merge addOns: combine existing and new, summing quantities for same addOnId
+	// 							const addOnMap = new Map();
+
+	// 							// Add existing addOns to map
+	// 							existingAddOns.forEach(addOn => {
+	// 								const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
+	// 								if (addOnId) {
+	// 									addOnMap.set(addOnId, {
+	// 										addOnId: addOn.addOnId,
+	// 										name: addOn.name,
+	// 										price: addOn.price,
+	// 										quantity: addOn.quantity || 1
+	// 									});
+	// 								}
+	// 							});
+
+	// 							// Merge new addOns into map
+	// 							filteredAddOns.forEach(addOn => {
+	// 								const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
+	// 								if (addOnId) {
+	// 									const existing = addOnMap.get(addOnId);
+	// 									if (existing) {
+	// 										// Add quantities if same addOn
+	// 										existing.quantity = (existing.quantity || 1) + (addOn.quantity || 1);
+	// 									} else {
+	// 										// Add new addOn
+	// 										addOnMap.set(addOnId, {
+	// 											addOnId: addOn.addOnId,
+	// 											name: addOn.name,
+	// 											price: addOn.price,
+	// 											quantity: addOn.quantity || 1
+	// 										});
+	// 									}
+	// 								}
+	// 							});
+
+	// 							existingItem.addOns = Array.from(addOnMap.values());
+	// 							addOnsModified = true;
+	// 						}
+	// 					}
+	// 					existingItem.packingCharge = packingChargePerUnit;
+	// 					if (!addOnsModified) {
+	// 						this.updateCartItemTotals(existingItem);
+	// 					}
+	// 				}
+
+	// 				if (existingItem && isSetQuantityOperation) {
+	// 					// SET quantity to target value
+	// 					existingItem.quantity = targetQuantity;
+	// 					existingItem.isPrebook = isPrebookFood;
+	// 					this.updateCartItemTotals(existingItem);
+	// 				} else if (existingItem && isIncrementOperation) {
+	// 					// Increment operation (boolean true or increment by 1)
+	// 					existingItem.quantity += 1;
+	// 					existingItem.isPrebook = isPrebookFood;
+	// 					this.updateCartItemTotals(existingItem);
+	// 				} else if (existingItem && !isIncrementOperation) {
+	// 					// Decrement operation (boolean false)
+	// 					existingItem.quantity = Math.max(0, existingItem.quantity - 1);
+	// 					existingItem.isPrebook = isPrebookFood;
+	// 					if (existingItem.quantity === 0) {
+	// 						cart.items = cart.items.filter((item) => item._id.toString() !== existingItem._id.toString());
+	// 					} else {
+	// 						this.updateCartItemTotals(existingItem);
+	// 					}
+	// 				} else if (existingItem) {
+	// 					// Increment operation (boolean true)
+	// 					existingItem.quantity += 1;
+	// 					existingItem.isPrebook = isPrebookFood;
+	// 					this.updateCartItemTotals(existingItem);
+	// 				} else {
+	// 					// New item - use targetQuantity if set, otherwise use absoluteQuantity (for boolean operations)
+	// 					const initialQuantity = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
+	// 					const newItem = {
+	// 						food: food._id,
+	// 						foodName: food.foodName,
+	// 						foodImage: food.foodImage,
+	// 						foodType: food.type,
+	// 						quantity: initialQuantity,
+	// 						basePrice: food.basePrice,
+	// 						discountPrice: normalizedDiscountPrice,
+	// 						effectivePrice,
+	// 						usesCustomizationPrice,
+	// 						customizations: filteredCustomizations,
+	// 						addOns: filteredAddOns,
+	// 						isPrebook: isPrebookFood,
+	// 						packingCharge: packingChargePerUnit,
+	// 						notes: notes?.trim() || null
+	// 					};
+	// 					this.updateCartItemTotals(newItem);
+	// 					cart.items.push(newItem);
+	// 				}
+	// 			}
+
+	// 			if (existingItem && cart.items.includes(existingItem)) {
+	// 				this.updateCartItemTotals(existingItem);
+	// 			}
+	// 		}
+
+	// 		if (cart.items.length === 0) {
+	// 			// If this is a connected cart, disconnect all users before deleting
+	// 			if (cart.connectedUsers && cart.connectedUsers.length > 0) {
+	// 				await Cart.updateMany(
+	// 					{ connectedCart: cart._id },
+	// 					{ $unset: { connectedCart: 1 } }
+	// 				);
+	// 			}
+	// 			await Cart.deleteOne({ _id: cart._id });
+	// 			return res.json({
+	// 				success: true,
+	// 				message: 'Cart cleared after decrement',
+	// 				data: this.formatCartResponse(null)
+	// 			});
+	// 		}
+
+	// 		cart.isPrebookCart = cart.items.some((item) => item.isPrebook);
+
+	// 		// Revalidate coupon if present when cart totals change
+	// 		if (cart.couponCode) {
+	// 			const orderAmount = cart.totals?.grandTotal || cart.totals?.subTotal || 0;
+	// 			const vendorId = this.getVendorId(cart.vendor);
+	// 			const validation = await Coupon.validateCoupon(
+	// 				cart.couponCode,
+	// 				req.user.id,
+	// 				orderAmount,
+	// 				vendorId
+	// 			);
+
+	// 			if (!validation.valid) {
+	// 				// Remove invalid coupon
+	// 				cart.couponCode = null;
+	// 				cart.couponDiscount = 0;
+	// 				cart.totals.couponDiscount = 0;
+	// 			} else {
+	// 				// Recalculate coupon discount with new totals
+	// 				cart.couponDiscount = validation.discount;
+	// 			}
+	// 		}
+
+	// 		await cart.save();
+
+	// 		await cart.populate([
+	// 			{ path: 'vendor', select: 'restaurantName profileImage address serviceOffered' },
+	// 			{ path: 'items.food', select: 'foodName foodImage type' }
+	// 		]);
+
+	// 		return res.status(201).json({
+	// 			success: true,
+	// 			message: 'Item added to cart successfully',
+	// 			data: this.formatCartResponse(cart)
+	// 		});
+	// 	} catch (error) {
+	// 		console.error('Error adding item to cart:', error);
+	// 		return res.status(500).json({
+	// 			success: false,
+	// 			message: 'Failed to add item to cart',
+	// 			error: error.message
+	// 		});
+	// 	}
+	// }
 	async addItem(req, res) {
 		try {
 			const errors = validationResult(req);
@@ -351,6 +1142,9 @@ class CartController {
 			} = req.body;
 
 			const hasCustomizationsInput = Object.prototype.hasOwnProperty.call(req.body, 'customizations');
+			const hasAddOnsInput = Object.prototype.hasOwnProperty.call(req.body, 'addOns');
+			// updateAddOns flag: only needed when user is explicitly editing add-ons on an existing cart item
+			const updateAddOns = req.body.updateAddOns === true;
 
 			let quantityDelta;
 			let isIncrementOperation = true;
@@ -383,7 +1177,7 @@ class CartController {
 					// Number > 0: SET quantity to this value (not add)
 					targetQuantity = Math.floor(parsedQuantity);
 					isSetQuantityOperation = true;
-					quantityDelta = targetQuantity; // Keep for backward compatibility in calculations
+					quantityDelta = targetQuantity;
 				}
 			}
 
@@ -431,7 +1225,6 @@ class CartController {
 			// If user has a cart record but getWorkingCart returned null
 			if (userCart && !cart) {
 				if (userCart.connectedCart) {
-					// User is connected but connected cart doesn't exist or is invalid
 					return res.status(400).json({
 						success: false,
 						message: 'Connected cart is invalid. Please disconnect and reconnect to a cart.'
@@ -495,7 +1288,6 @@ class CartController {
 					if (!input || typeof input !== 'object') {
 						return true;
 					}
-
 					const hasId = Boolean(input.customizationId || input.id);
 					const hasQuantity = input.quantity !== undefined && input.quantity !== null;
 					return !hasId || !hasQuantity;
@@ -543,6 +1335,7 @@ class CartController {
 					message: 'Invalid customization selected'
 				});
 			}
+
 			const filteredCustomizations = resolvedCustomizations.filter((entry) => entry && entry.quantity > 0);
 			const customizationSignaturePayload = customizationRemovalRequested
 				? resolvedCustomizations.filter(Boolean)
@@ -555,6 +1348,7 @@ class CartController {
 				});
 			}
 
+			// Resolve addOns from the request (always resolve since frontend always sends addOns array)
 			const resolvedAddOns = (addOns || []).map((addOnInput) => {
 				const addOnId =
 					typeof addOnInput === 'string'
@@ -591,11 +1385,9 @@ class CartController {
 					message: 'Invalid add-on selected'
 				});
 			}
+
 			const addOnsMarkedForRemoval = resolvedAddOns.filter((entry) => entry && entry.quantity === 0);
 			const filteredAddOns = resolvedAddOns.filter((entry) => entry && entry.quantity > 0);
-			const hasAddOnRemovals = addOnsMarkedForRemoval.length > 0;
-			const hasAddOnAdditions = filteredAddOns.length > 0;
-			let addOnsModified = false;
 
 			// Calculate pricing with current date/time for day offers
 			const pricing = calculateFoodPricing(food, { currentDate: new Date() });
@@ -605,12 +1397,6 @@ class CartController {
 			const effectivePrice = usesCustomizationPrice ? customizationUnitBase : pricing.finalPrice;
 			const normalizedDiscountPrice = usesCustomizationPrice ? null : pricing.discountPrice;
 
-			const addOnOrderTotal = filteredAddOns.reduce(
-				(sum, addOn) => sum + addOn.price * (addOn.quantity || 1),
-				0
-			);
-			const customizationUnitTotal = usesCustomizationPrice ? 0 : customizationUnitBase;
-
 			// Calculate packing charge based on service type
 			// Packing charges apply only for 'take away' and 'delivery'
 			const packingChargePerUnit = PACKING_CHARGE_SERVICE_TYPES.includes(normalizedServiceType)
@@ -618,8 +1404,6 @@ class CartController {
 				: 0;
 
 			const absoluteQuantity = Math.abs(quantityDelta);
-			// For new items: use targetQuantity if set, otherwise use absoluteQuantity
-			const quantityForNewItem = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
 
 			if (!cart) {
 				// Check if user is connected before creating a new cart
@@ -657,7 +1441,6 @@ class CartController {
 			);
 
 			// First, try to find exact match (same food, customizations, and addOns)
-			// This is for incrementing quantity of the exact same item
 			let existingItem = cart.items.find((item) => {
 				const signature = this.buildSelectionSignature(
 					this.getFoodId(item.food),
@@ -672,14 +1455,24 @@ class CartController {
 			});
 
 			// If no exact match found, find item with same foodId only
-			// This allows merging customizations/addOns into existing items when same food is added multiple times
 			if (!existingItem && cart.items.length > 0) {
 				existingItem = cart.items.find((item) => {
 					const currentItemFoodId = this.getFoodId(item.food);
-					// Simply match by foodId - we'll merge customizations and addOns below
 					return currentItemFoodId.toString() === foodId.toString();
 				});
 			}
+
+			// ✅ KEY FIX: Determine whether to process addOns based on context
+			// - New item (no existingItem): always use the addOns sent (even empty array means no add-ons)
+			// - Existing item: only update addOns if frontend explicitly set updateAddOns: true
+			const shouldProcessAddOns = hasAddOnsInput && (
+				!existingItem ||        // new item: always respect addOns from request
+				updateAddOns === true   // existing item: only update if explicitly requested
+			);
+
+			const hasAddOnRemovals = shouldProcessAddOns && addOnsMarkedForRemoval.length > 0;
+			const hasAddOnAdditions = shouldProcessAddOns && filteredAddOns.length > 0;
+			let addOnsModified = false;
 
 			if (!existingItem && hasAddOnRemovals) {
 				existingItem = cart.items.find((item) => {
@@ -736,7 +1529,6 @@ class CartController {
 					});
 				}
 
-				// Remove only the requested customizations (quantity = 0)
 				const customizationsMarkedForRemoval = resolvedCustomizations.filter(
 					(entry) => entry && entry.quantity === 0
 				);
@@ -754,7 +1546,6 @@ class CartController {
 							)
 					);
 
-					// If nothing changed, customization wasn't found on the item
 					if (filteredExisting.length === existingList.length) {
 						return res.status(404).json({
 							success: false,
@@ -764,14 +1555,11 @@ class CartController {
 
 					existingItem.customizations = filteredExisting;
 
-					// If no customizations remain and item pricing depends on customizations,
-					// remove the entire item from cart
 					if ((existingItem.customizations || []).length === 0 && existingItem.usesCustomizationPrice) {
 						cart.items = cart.items.filter(
 							(item) => item._id.toString() !== existingItem._id.toString()
 						);
 					} else {
-						// Recalculate totals for the updated item
 						if (existingItem.usesCustomizationPrice) {
 							const mergedCustomizationPrice = this.calculateCustomizationPrice(
 								existingItem.customizations || []
@@ -803,7 +1591,6 @@ class CartController {
 					if (hasCustomizationsInput) {
 						const customizationMap = new Map();
 
-						// Add existing customizations to map
 						customizationsForItem.forEach(custom => {
 							const customId = custom.customizationId?.toString() || custom.customizationId;
 							if (customId) {
@@ -816,16 +1603,14 @@ class CartController {
 							}
 						});
 
-						// Merge new customizations into map
 						filteredCustomizations.forEach(custom => {
 							const customId = custom.customizationId?.toString() || custom.customizationId;
 							if (customId) {
 								const existing = customizationMap.get(customId);
 								if (existing) {
-									// Same customization ID: update quantity (replace, not add)
+									// Same customization: replace quantity (not accumulate)
 									existing.quantity = custom.quantity || 1;
 								} else {
-									// New customization: add it
 									customizationMap.set(customId, {
 										customizationId: custom.customizationId,
 										name: custom.name,
@@ -839,12 +1624,11 @@ class CartController {
 						customizationsForItem = Array.from(customizationMap.values());
 					}
 
-					// Merge addOns instead of replacing
+					// ✅ Only merge addOns when shouldProcessAddOns is true
 					let addOnsForItem = existingItem.addOns || [];
-					if (hasAddOnAdditions) {
+					if (shouldProcessAddOns && hasAddOnAdditions) {
 						const addOnMap = new Map();
 
-						// Add existing addOns to map
 						addOnsForItem.forEach(addOn => {
 							const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
 							if (addOnId) {
@@ -857,16 +1641,14 @@ class CartController {
 							}
 						});
 
-						// Merge new addOns into map
 						filteredAddOns.forEach(addOn => {
 							const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
 							if (addOnId) {
 								const existing = addOnMap.get(addOnId);
 								if (existing) {
-									// Same addOn ID: add quantities
-									existing.quantity = (existing.quantity || 1) + (addOn.quantity || 1);
+									// ✅ Replace quantity, never accumulate
+									existing.quantity = addOn.quantity || 1;
 								} else {
-									// New addOn: add it
 									addOnMap.set(addOnId, {
 										addOnId: addOn.addOnId,
 										name: addOn.name,
@@ -904,12 +1686,9 @@ class CartController {
 
 					if (existingItem) {
 						if (hasCustomizationsInput) {
-							// Always merge customizations: add new customizations to existing ones
-							// If same customization ID exists, update quantity; otherwise add new customization
 							const existingCustomizations = existingItem.customizations || [];
 							const customizationMap = new Map();
 
-							// Add existing customizations to map
 							existingCustomizations.forEach(custom => {
 								const customId = custom.customizationId?.toString() || custom.customizationId;
 								if (customId) {
@@ -922,16 +1701,13 @@ class CartController {
 								}
 							});
 
-							// Merge new customizations into map
 							filteredCustomizations.forEach(custom => {
 								const customId = custom.customizationId?.toString() || custom.customizationId;
 								if (customId) {
 									const existing = customizationMap.get(customId);
 									if (existing) {
-										// Same customization ID: update quantity (replace, not add)
 										existing.quantity = custom.quantity || 1;
 									} else {
-										// New customization: add it
 										customizationMap.set(customId, {
 											customizationId: custom.customizationId,
 											name: custom.name,
@@ -945,25 +1721,22 @@ class CartController {
 							const mergedCustomizations = Array.from(customizationMap.values());
 							existingItem.customizations = mergedCustomizations;
 
-							// Recalculate effectivePrice if item uses customization price
 							if (existingItem.usesCustomizationPrice) {
 								const mergedCustomizationPrice = this.calculateCustomizationPrice(mergedCustomizations);
 								existingItem.effectivePrice = mergedCustomizationPrice;
 							}
 						}
-						if (hasAddOnAdditions) {
-							// Merge addOns: if existing item has no addOns, use the new ones
-							// If both have addOns, merge by addOnId (add quantities if same addOn, otherwise add new)
+
+						// ✅ Only merge addOns when shouldProcessAddOns is true
+						if (shouldProcessAddOns && hasAddOnAdditions) {
 							const existingAddOns = existingItem.addOns || [];
 							if (existingAddOns.length === 0) {
-								// Existing item has no addOns, use the new ones
+								// No existing addOns, use the new ones directly
 								existingItem.addOns = filteredAddOns;
 								addOnsModified = true;
 							} else {
-								// Merge addOns: combine existing and new, summing quantities for same addOnId
 								const addOnMap = new Map();
 
-								// Add existing addOns to map
 								existingAddOns.forEach(addOn => {
 									const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
 									if (addOnId) {
@@ -976,16 +1749,14 @@ class CartController {
 									}
 								});
 
-								// Merge new addOns into map
 								filteredAddOns.forEach(addOn => {
 									const addOnId = addOn.addOnId?.toString() || addOn.addOnId;
 									if (addOnId) {
 										const existing = addOnMap.get(addOnId);
 										if (existing) {
-											// Add quantities if same addOn
-											existing.quantity = (existing.quantity || 1) + (addOn.quantity || 1);
+											// ✅ Replace quantity, never accumulate
+											existing.quantity = addOn.quantity || 1;
 										} else {
-											// Add new addOn
 											addOnMap.set(addOnId, {
 												addOnId: addOn.addOnId,
 												name: addOn.name,
@@ -1000,6 +1771,7 @@ class CartController {
 								addOnsModified = true;
 							}
 						}
+
 						existingItem.packingCharge = packingChargePerUnit;
 						if (!addOnsModified) {
 							this.updateCartItemTotals(existingItem);
@@ -1007,17 +1779,14 @@ class CartController {
 					}
 
 					if (existingItem && isSetQuantityOperation) {
-						// SET quantity to target value
 						existingItem.quantity = targetQuantity;
 						existingItem.isPrebook = isPrebookFood;
 						this.updateCartItemTotals(existingItem);
 					} else if (existingItem && isIncrementOperation) {
-						// Increment operation (boolean true or increment by 1)
 						existingItem.quantity += 1;
 						existingItem.isPrebook = isPrebookFood;
 						this.updateCartItemTotals(existingItem);
 					} else if (existingItem && !isIncrementOperation) {
-						// Decrement operation (boolean false)
 						existingItem.quantity = Math.max(0, existingItem.quantity - 1);
 						existingItem.isPrebook = isPrebookFood;
 						if (existingItem.quantity === 0) {
@@ -1026,12 +1795,11 @@ class CartController {
 							this.updateCartItemTotals(existingItem);
 						}
 					} else if (existingItem) {
-						// Increment operation (boolean true)
 						existingItem.quantity += 1;
 						existingItem.isPrebook = isPrebookFood;
 						this.updateCartItemTotals(existingItem);
 					} else {
-						// New item - use targetQuantity if set, otherwise use absoluteQuantity (for boolean operations)
+						// New item
 						const initialQuantity = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
 						const newItem = {
 							food: food._id,
@@ -1044,7 +1812,7 @@ class CartController {
 							effectivePrice,
 							usesCustomizationPrice,
 							customizations: filteredCustomizations,
-							addOns: filteredAddOns,
+							addOns: filteredAddOns,    // for new items, always use what was sent (even empty)
 							isPrebook: isPrebookFood,
 							packingCharge: packingChargePerUnit,
 							notes: notes?.trim() || null
@@ -1089,12 +1857,10 @@ class CartController {
 				);
 
 				if (!validation.valid) {
-					// Remove invalid coupon
 					cart.couponCode = null;
 					cart.couponDiscount = 0;
 					cart.totals.couponDiscount = 0;
 				} else {
-					// Recalculate coupon discount with new totals
 					cart.couponDiscount = validation.discount;
 				}
 			}
