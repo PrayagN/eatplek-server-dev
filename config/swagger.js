@@ -15,9 +15,13 @@ const swaggerOptions = {
         description: 'Development server'
       },
       {
-        url: 'https://api-dev.eatplek.com',
+        url: ' https://eatplek-server-dev.onrender.com',
         description: 'Production server'
       }
+      // {
+      //   url: 'https://api-dev.eatplek.com',
+      //   description: 'Production server'
+      // }
     ],
     components: {
       securitySchemes: {
