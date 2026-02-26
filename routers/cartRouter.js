@@ -4,34 +4,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { getCart, addItem, removeItem, clearCart, connectCart, disconnectCart, getAvailableAddOns } = require('../controllers/cartController');
 const { addToCartValidation, removeCartItemValidation, connectCartValidation } = require('../validations/cart.validations');
 
-router.use((req, res, next) => {
-  console.log(`[CART ROUTER HIT] ${req.method} ${req.originalUrl} | path=${req.path}`);
-  next();
-});
-
-
 
 router.get('/items/:itemId/addons', authenticateToken, getAvailableAddOns);
-router.get('/items/:itemId/debug-test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Debug route works',
-    receivedItemId: req.params.itemId,
-    originalUrl: req.originalUrl,
-    path: req.path
-  });
-});
-
-// Temporary super-simple test route — no auth, no validation, nothing
-router.get('/test-railway-deploy', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Railway deploy test successful!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'unknown',
-    note: 'If you see this → latest code is live on Railway'
-  });
-});
 router.get('/', authenticateToken, getCart);
 router.post('/items', authenticateToken, addToCartValidation, addItem);
 router.delete('/', authenticateToken, clearCart);
@@ -41,10 +15,6 @@ router.post('/disconnect', authenticateToken, disconnectCart);
 
 router.delete('/items/:itemId', authenticateToken, removeCartItemValidation, removeItem);
 
-console.log('Registered cart routes:');
-router.stack.forEach(r => {
-  if (r.route) console.log(r.route.path, Object.keys(r.route.methods));
-});
 
 
 module.exports = router;
