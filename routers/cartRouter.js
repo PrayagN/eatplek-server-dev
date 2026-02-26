@@ -11,7 +11,7 @@ router.post('/connect', authenticateToken, connectCartValidation, connectCart);
 router.post('/disconnect', authenticateToken, disconnectCart);
 
 
-router.get('/items/:itemId/add-ons', authenticateToken, getAvailableAddOns);
+router.get('/items/:itemId/addons', authenticateToken, getAvailableAddOns);
 router.delete('/items/:itemId', authenticateToken, removeCartItemValidation, removeItem);
 
 console.log('Registered cart routes:');

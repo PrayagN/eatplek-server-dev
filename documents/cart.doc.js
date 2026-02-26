@@ -315,7 +315,7 @@
 
 /**
  * @swagger
- * /api/cart/items/{itemId}/add-ons:
+ * /api/cart/items/{itemId}/addons:
  *   get:
  *     summary: Get unselected add-ons for a cart item
  *     description: >
