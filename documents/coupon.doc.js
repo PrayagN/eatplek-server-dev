@@ -461,6 +461,111 @@
 
 /**
  * @swagger
+ * /api/coupons/user/list:
+ *   get:
+ *     summary: Get available coupons for the current user
+ *     description: |
+ *       Returns a list of coupons the authenticated user can actually use.
+ *       Automatically filters out:
+ *       - Inactive coupons
+ *       - Expired coupons
+ *       - Coupons that have hit their usage limit
+ *       - One-time-use coupons already used by this user
+ *
+ *       Optionally filter by `vendorId` to get only coupons applicable to a specific vendor (vendor-specific + global coupons).
+ *     tags: [Coupons]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: vendorId
+ *         schema:
+ *           type: string
+ *         description: Filter coupons applicable to a specific vendor (returns vendor-specific + global coupons). If omitted, all usable coupons are returned.
+ *         example: "60d5ec49f1b2c72b8c1a2b3c"
+ *     responses:
+ *       200:
+ *         description: Coupons retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Coupons retrieved successfully
+ *                 count:
+ *                   type: integer
+ *                   description: Number of usable coupons returned
+ *                   example: 3
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "60d5ec49f1b2c72b8c1a2b3c"
+ *                       code:
+ *                         type: string
+ *                         example: "SAVE20"
+ *                       discountType:
+ *                         type: string
+ *                         enum: [percentage, fixed]
+ *                         example: "percentage"
+ *                       discountValue:
+ *                         type: number
+ *                         example: 20
+ *                       maxDiscountAmount:
+ *                         type: number
+ *                         nullable: true
+ *                         example: 100
+ *                       minOrderAmount:
+ *                         type: number
+ *                         nullable: true
+ *                         example: 500
+ *                       isOneTimeUse:
+ *                         type: boolean
+ *                         example: true
+ *                       usageLimit:
+ *                         type: integer
+ *                         nullable: true
+ *                         example: 100
+ *                       usedCount:
+ *                         type: integer
+ *                         example: 45
+ *                       expiresAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: "2025-12-31T23:59:59Z"
+ *                       description:
+ *                         type: string
+ *                         nullable: true
+ *                         example: "Save 20% up to ₹100 on orders above ₹500"
+ *                       vendorDetails:
+ *                         type: object
+ *                         nullable: true
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             example: "60d5ec49f1b2c72b8c1a2b3c"
+ *                           name:
+ *                             type: string
+ *                             example: "Delicious Restaurant"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       400:
+ *         description: Validation error (invalid vendorId format)
+ *       500:
+ *         description: Server error
+ */
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     CouponResponse:

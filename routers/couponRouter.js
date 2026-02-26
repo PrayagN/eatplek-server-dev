@@ -9,7 +9,8 @@ const {
 	deleteCoupon,
 	validateCoupon,
 	applyCoupon,
-	removeCoupon
+	removeCoupon,
+	getUserCoupons
 } = require('../controllers/couponController');
 const {
 	createCouponValidation,
@@ -17,10 +18,20 @@ const {
 	getCouponByIdValidation,
 	deleteCouponValidation,
 	validateCouponValidation,
-	applyCouponValidation
+	applyCouponValidation,
+	getUserCouponsValidation
 } = require('../validations/coupon.validations');
 
 // User routes for coupon operations
+
+// GET list of available coupons for the current user
+router.get(
+	'/user/list',
+	authenticateToken,
+	getUserCouponsValidation,
+	getUserCoupons
+);
+
 router.post(
 	'/validate',
 	authenticateToken,

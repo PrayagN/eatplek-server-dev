@@ -208,12 +208,20 @@ const applyCouponValidation = [
 		.withMessage('Coupon code cannot be empty')
 ];
 
+const getUserCouponsValidation = [
+	query('vendorId')
+		.optional({ nullable: true, checkFalsy: true })
+		.isMongoId()
+		.withMessage('vendorId must be a valid MongoDB ID')
+];
+
 module.exports = {
 	createCouponValidation,
 	updateCouponValidation,
 	getCouponByIdValidation,
 	deleteCouponValidation,
 	validateCouponValidation,
-	applyCouponValidation
+	applyCouponValidation,
+	getUserCouponsValidation
 };
 

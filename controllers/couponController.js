@@ -15,9 +15,9 @@ class CouponController {
 			vendor: coupon.vendor?.toString() || null,
 			vendorDetails: coupon.vendor
 				? {
-						id: coupon.vendor._id?.toString() || coupon.vendor.toString(),
-						name: coupon.vendor.restaurantName || null
-					}
+					id: coupon.vendor._id?.toString() || coupon.vendor.toString(),
+					name: coupon.vendor.restaurantName || null
+				}
 				: null,
 			discountType: coupon.discountType,
 			discountValue: coupon.discountValue,
@@ -446,7 +446,7 @@ class CouponController {
 			cart.couponCode = validation.coupon.code;
 			cart.couponDiscount = validation.discount;
 			cart.totals.couponDiscount = validation.discount;
-			
+
 			// Recalculate totals (this will apply coupon discount)
 			cart.calculateTotals();
 			await cart.save();
@@ -505,7 +505,7 @@ class CouponController {
 			cart.couponCode = null;
 			cart.couponDiscount = 0;
 			cart.totals.couponDiscount = 0;
-			
+
 			// Recalculate totals without coupon
 			cart.calculateTotals();
 			await cart.save();
@@ -528,6 +528,83 @@ class CouponController {
 			});
 		}
 	}
+
+	async getUserCoupons(req, res) {
+		try {
+			const userId = req.user.id;
+			const { vendorId } = req.query;
+			const now = new Date();
+
+			// Base query: only active, non-expired coupons
+			const query = {
+				isActive: true,
+				$or: [{ expiresAt: null }, { expiresAt: { $gt: now } }]
+			};
+
+			// If vendorId provided, return vendor-specific coupons for that vendor + global coupons
+			// If no vendorId, return all coupons (global + all vendor-specific)
+			if (vendorId) {
+				query.$and = [{ $or: [{ vendor: vendorId }, { vendor: null }] }];
+			}
+
+			const coupons = await Coupon.find(query)
+				.populate('vendor', 'restaurantName')
+				.sort({ createdAt: -1 });
+
+			// Further filter in JS:
+			// 1. Usage limit not exhausted
+			// 2. One-time use: current user hasn't used it
+			const userIdStr = userId.toString();
+			const usableCoupons = coupons.filter((coupon) => {
+				// Check usage limit
+				if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
+					return false;
+				}
+				// Check one-time use — exclude if user already used it
+				if (coupon.isOneTimeUse) {
+					const hasUsed = coupon.usedByUsers.some(
+						(id) => id.toString() === userIdStr
+					);
+					if (hasUsed) return false;
+				}
+				return true;
+			});
+
+			const formattedCoupons = usableCoupons.map((coupon) => ({
+				id: coupon._id?.toString(),
+				code: coupon.code,
+				discountType: coupon.discountType,
+				discountValue: coupon.discountValue,
+				maxDiscountAmount: coupon.maxDiscountAmount,
+				minOrderAmount: coupon.minOrderAmount,
+				isOneTimeUse: coupon.isOneTimeUse,
+				usageLimit: coupon.usageLimit,
+				usedCount: coupon.usedCount,
+				expiresAt: coupon.expiresAt,
+				description: coupon.description,
+				vendorDetails: coupon.vendor
+					? {
+						id: coupon.vendor._id?.toString() || coupon.vendor.toString(),
+						name: coupon.vendor.restaurantName || null
+					}
+					: null
+			}));
+
+			return res.json({
+				success: true,
+				message: 'Coupons retrieved successfully',
+				count: formattedCoupons.length,
+				data: formattedCoupons
+			});
+		} catch (error) {
+			console.error('Error fetching user coupons:', error);
+			return res.status(500).json({
+				success: false,
+				message: 'Failed to fetch coupons',
+				error: error.message
+			});
+		}
+	}
 }
 
 const controller = new CouponController();
@@ -540,6 +617,7 @@ module.exports = {
 	deleteCoupon: controller.deleteCoupon.bind(controller),
 	validateCoupon: controller.validateCoupon.bind(controller),
 	applyCoupon: controller.applyCoupon.bind(controller),
-	removeCoupon: controller.removeCoupon.bind(controller)
+	removeCoupon: controller.removeCoupon.bind(controller),
+	getUserCoupons: controller.getUserCoupons.bind(controller)
 };
 
