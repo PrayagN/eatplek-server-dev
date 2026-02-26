@@ -4,6 +4,11 @@ const { authenticateToken } = require('../middleware/auth');
 const { getCart, addItem, removeItem, clearCart, connectCart, disconnectCart, getAvailableAddOns } = require('../controllers/cartController');
 const { addToCartValidation, removeCartItemValidation, connectCartValidation } = require('../validations/cart.validations');
 
+router.use((req, res, next) => {
+  console.log(`[CART ROUTER HIT] ${req.method} ${req.originalUrl} | path=${req.path}`);
+  next();
+});
+
 router.get('/items/:itemId/addons', authenticateToken, getAvailableAddOns);
 router.get('/items/:itemId/debug-test', (req, res) => {
   res.json({
