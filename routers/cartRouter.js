@@ -5,6 +5,15 @@ const { getCart, addItem, removeItem, clearCart, connectCart, disconnectCart, ge
 const { addToCartValidation, removeCartItemValidation, connectCartValidation } = require('../validations/cart.validations');
 
 router.get('/items/:itemId/addons', authenticateToken, getAvailableAddOns);
+router.get('/items/:itemId/debug-test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Debug route works',
+    receivedItemId: req.params.itemId,
+    originalUrl: req.originalUrl,
+    path: req.path
+  });
+});
 router.get('/', authenticateToken, getCart);
 router.post('/items', authenticateToken, addToCartValidation, addItem);
 router.delete('/', authenticateToken, clearCart);
