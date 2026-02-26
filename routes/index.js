@@ -38,6 +38,7 @@ const registerRoutes = (app, { authLimiter, otpLimiter, passwordResetLimiter }) 
 	// ============================================
 	// PRIMARY API ROUTES
 	// ============================================
+	app.use('/api/cart', cartRouter);
 	app.use('/api/admin', adminAuthRouter);
 	app.use('/api/vendors', vendorRouter);
 	app.use('/api/vendor-auth', vendorAuthRouter);
@@ -46,7 +47,6 @@ const registerRoutes = (app, { authLimiter, otpLimiter, passwordResetLimiter }) 
 	app.use('/api/users', userRouter);
 	app.use('/api/uploads', uploadRouter);
 	app.use('/api/banners', bannerRouter);
-	app.use('/api/cart', cartRouter);
 	app.use('/api/bookings', bookingRouter);
 	app.use('/api/coupons', couponRouter);
 	app.use('/api/vendor', vendorOrderRouter);
