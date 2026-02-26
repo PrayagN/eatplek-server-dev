@@ -9,6 +9,8 @@ router.use((req, res, next) => {
   next();
 });
 
+
+
 router.get('/items/:itemId/addons', authenticateToken, getAvailableAddOns);
 router.get('/items/:itemId/debug-test', (req, res) => {
   res.json({
@@ -17,6 +19,17 @@ router.get('/items/:itemId/debug-test', (req, res) => {
     receivedItemId: req.params.itemId,
     originalUrl: req.originalUrl,
     path: req.path
+  });
+});
+
+// Temporary super-simple test route — no auth, no validation, nothing
+router.get('/test-railway-deploy', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Railway deploy test successful!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'unknown',
+    note: 'If you see this → latest code is live on Railway'
   });
 });
 router.get('/', authenticateToken, getCart);
