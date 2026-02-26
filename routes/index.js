@@ -21,6 +21,11 @@ const shareRouter = require('../routers/shareRouter');
  * @param {Function} options.passwordResetLimiter - Rate limiter for password reset routes
  */
 const registerRoutes = (app, { authLimiter, otpLimiter, passwordResetLimiter }) => {
+
+	app.use((req, res, next) => {
+		console.log(`[DEBUG] ${req.method} ${req.originalUrl} | IP: ${req.ip}`);
+		next();
+	});
 	// ============================================
 	// AUTH ROUTES WITH STRICT RATE LIMITING
 	// ============================================
