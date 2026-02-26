@@ -5,12 +5,13 @@ const { getCart, addItem, removeItem, clearCart, connectCart, disconnectCart, ge
 const { addToCartValidation, removeCartItemValidation, connectCartValidation } = require('../validations/cart.validations');
 
 router.get('/', authenticateToken, getCart);
-router.get('/items/:itemId/add-ons', authenticateToken, getAvailableAddOns);
 router.post('/items', authenticateToken, addToCartValidation, addItem);
-router.delete('/items/:itemId', authenticateToken, removeCartItemValidation, removeItem);
 router.delete('/', authenticateToken, clearCart);
 router.post('/connect', authenticateToken, connectCartValidation, connectCart);
 router.post('/disconnect', authenticateToken, disconnectCart);
 
-module.exports = router;
 
+router.get('/items/:itemId/add-ons', authenticateToken, getAvailableAddOns);
+router.delete('/items/:itemId', authenticateToken, removeCartItemValidation, removeItem);
+
+module.exports = router;
