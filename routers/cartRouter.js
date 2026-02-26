@@ -14,4 +14,10 @@ router.post('/disconnect', authenticateToken, disconnectCart);
 router.get('/items/:itemId/add-ons', authenticateToken, getAvailableAddOns);
 router.delete('/items/:itemId', authenticateToken, removeCartItemValidation, removeItem);
 
+console.log('Registered cart routes:');
+router.stack.forEach(r => {
+  if (r.route) console.log(r.route.path, Object.keys(r.route.methods));
+});
+
+
 module.exports = router;
