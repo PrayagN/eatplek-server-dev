@@ -15,7 +15,7 @@ const swaggerOptions = {
         description: 'Development server'
       },
       {
-        url: ' https://eatplek-server-dev.onrender.com',
+        url: 'https://eatplek-server-dev-production.up.railway.app',
         description: 'Production server'
       }
       // {
