@@ -1582,6 +1582,7 @@ class CartController {
 				cart.items = cart.items.filter((item) => item._id.toString() !== existingItem._id.toString());
 			} else {
 				let customizationHandled = false;
+				let itemRemoved = false;
 
 				if (existingItem && usesCustomizationPrice) {
 					customizationHandled = true;
@@ -1603,20 +1604,25 @@ class CartController {
 							}
 						});
 
-						filteredCustomizations.forEach(custom => {
+						resolvedCustomizations.forEach(custom => {
+							if (!custom) return;
 							const customId = custom.customizationId?.toString() || custom.customizationId;
 							if (customId) {
-								const existing = customizationMap.get(customId);
-								if (existing) {
-									// Same customization: replace quantity (not accumulate)
-									existing.quantity = custom.quantity || 1;
+								if (custom.quantity === 0) {
+									customizationMap.delete(customId);
 								} else {
-									customizationMap.set(customId, {
-										customizationId: custom.customizationId,
-										name: custom.name,
-										price: custom.price,
-										quantity: custom.quantity || 1
-									});
+									const existing = customizationMap.get(customId);
+									if (existing) {
+										// Same customization: replace quantity (not accumulate)
+										existing.quantity = custom.quantity || 1;
+									} else {
+										customizationMap.set(customId, {
+											customizationId: custom.customizationId,
+											name: custom.name,
+											price: custom.price,
+											quantity: custom.quantity || 1
+										});
+									}
 								}
 							}
 						});
@@ -1663,17 +1669,23 @@ class CartController {
 						addOnsModified = true;
 					}
 
-					existingItem.customizations = customizationsForItem;
-					existingItem.addOns = addOnsForItem;
-					existingItem.quantity = 1;
-					existingItem.usesCustomizationPrice = true;
-					existingItem.discountPrice = null;
-					existingItem.packingCharge = packingChargePerUnit;
-					existingItem.isPrebook = isPrebookFood;
+					if (customizationsForItem.length === 0) {
+						cart.items = cart.items.filter((item) => item._id.toString() !== existingItem._id.toString());
+						itemRemoved = true;
+						existingItem = null;
+					} else {
+						existingItem.customizations = customizationsForItem;
+						existingItem.addOns = addOnsForItem;
+						existingItem.quantity = 1;
+						existingItem.usesCustomizationPrice = true;
+						existingItem.discountPrice = null;
+						existingItem.packingCharge = packingChargePerUnit;
+						existingItem.isPrebook = isPrebookFood;
 
-					const customizationPrice = this.calculateCustomizationPrice(customizationsForItem);
-					existingItem.effectivePrice = customizationPrice;
-					this.updateCartItemTotals(existingItem);
+						const customizationPrice = this.calculateCustomizationPrice(customizationsForItem);
+						existingItem.effectivePrice = customizationPrice;
+						this.updateCartItemTotals(existingItem);
+					}
 				}
 
 				if (!customizationHandled) {
@@ -1701,19 +1713,24 @@ class CartController {
 								}
 							});
 
-							filteredCustomizations.forEach(custom => {
+							resolvedCustomizations.forEach(custom => {
+								if (!custom) return;
 								const customId = custom.customizationId?.toString() || custom.customizationId;
 								if (customId) {
-									const existing = customizationMap.get(customId);
-									if (existing) {
-										existing.quantity = custom.quantity || 1;
+									if (custom.quantity === 0) {
+										customizationMap.delete(customId);
 									} else {
-										customizationMap.set(customId, {
-											customizationId: custom.customizationId,
-											name: custom.name,
-											price: custom.price,
-											quantity: custom.quantity || 1
-										});
+										const existing = customizationMap.get(customId);
+										if (existing) {
+											existing.quantity = custom.quantity || 1;
+										} else {
+											customizationMap.set(customId, {
+												customizationId: custom.customizationId,
+												name: custom.name,
+												price: custom.price,
+												quantity: custom.quantity || 1
+											});
+										}
 									}
 								}
 							});
@@ -1722,13 +1739,19 @@ class CartController {
 							existingItem.customizations = mergedCustomizations;
 
 							if (existingItem.usesCustomizationPrice) {
-								const mergedCustomizationPrice = this.calculateCustomizationPrice(mergedCustomizations);
-								existingItem.effectivePrice = mergedCustomizationPrice;
+								if (mergedCustomizations.length === 0) {
+									cart.items = cart.items.filter((item) => item._id.toString() !== existingItem._id.toString());
+									itemRemoved = true;
+									existingItem = null;
+								} else {
+									const mergedCustomizationPrice = this.calculateCustomizationPrice(mergedCustomizations);
+									existingItem.effectivePrice = mergedCustomizationPrice;
+								}
 							}
 						}
 
 						// ✅ Only merge addOns when shouldProcessAddOns is true
-						if (shouldProcessAddOns && hasAddOnAdditions) {
+						if (existingItem && shouldProcessAddOns && hasAddOnAdditions) {
 							const existingAddOns = existingItem.addOns || [];
 							if (existingAddOns.length === 0) {
 								// No existing addOns, use the new ones directly
@@ -1772,9 +1795,11 @@ class CartController {
 							}
 						}
 
-						existingItem.packingCharge = packingChargePerUnit;
-						if (!addOnsModified) {
-							this.updateCartItemTotals(existingItem);
+						if (existingItem) {
+							existingItem.packingCharge = packingChargePerUnit;
+							if (!addOnsModified) {
+								this.updateCartItemTotals(existingItem);
+							}
 						}
 					}
 
@@ -1798,7 +1823,7 @@ class CartController {
 						existingItem.quantity += 1;
 						existingItem.isPrebook = isPrebookFood;
 						this.updateCartItemTotals(existingItem);
-					} else {
+					} else if (!itemRemoved) {
 						// New item
 						const initialQuantity = isSetQuantityOperation ? targetQuantity : (usesCustomizationPrice ? 1 : absoluteQuantity);
 						const newItem = {
